@@ -1,2 +1,2 @@
 # Petit-Pyret-compiler
-A compiler for a sublanguage of Pyret
+A compiler written in OCaml for a sublanguage of Pyret
