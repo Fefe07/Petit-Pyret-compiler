@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token EOF  AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV MOD EQUAL LP RP LSQ RSQ COMMA COLUMN POLARGS
+%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW
 %token <Ast.binop> CMP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -36,31 +36,79 @@ block:
   | s = stmt+ {}
 
 stmt:
-  | FUN; id,a = fundecl; funbody
+  | FUN; id = ident; funbody {}
+  | VAR; id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
+  | id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
+  | VAR; id = IDENT; EQUAL; bexpr {}
+  | id = IDENT; EQUAL; bexpr {}
+  | id = IDENT; DEF; bexpr {}
+  | bexpr {}
 
-fundecl:
-  | id = IDENT; 
-  
+funbody:
+  | LP; p = funpar; ARROW; t = typ; ublock; block; END {}
 
-exprparams:
-  | p = expr; COMMA; tail = exprparams {p::tail}
-  | p = expr; RPAR {[p]}
-  | RPAR {[]}
+funpar:
+  | RP {[]}
+  | p = param; COMMA; f = funpar {p::f}
+  | p = param; RP {[p]}
+
+param:
+  | id = IDENT; DBLCOLUMN; t = typ {}
+
+ublock:
+  | COLUMN {}
+  | block; COLUMN {}
+
+
+typ:
+  | id = IDENT {}
+  | LP; typestar; typ; RP {}
+
+typestar:
+  | ARROW {[]}
+  | t = typ; ARROW {[t]}
+  | t = typ; COMMA; ts = typestar [t::ts]
+
+bexpr:
+  | expr {}
+  | bexpr; binop; expr {}
+
+binop:
+  | CMP {}
+  | PLUS {}
+  | MINUS {}
+  | TIMES {}
+  | DIV {}
 
 expr:
-  | i = CONST {Econst i}
-  | i = VAR {Evar i}
-  | e1 = expr; PLUS; e2 = expr {Ebinop (Add, e1, e2)}
-  | e1 = expr; MINUS; e2 = expr {Ebinop (Sub, e1, e2)}
-  | e1 = expr; TIMES; e2 = expr {Ebinop (Mul, e1, e2)}
-  | e1 = expr; DIVIDE; e2 = expr {Ebinop (Div, e1, e2)}
-  | MINUS; e = expr {Ebinop (Sub, Econst 0, e)}
-  | LPAR; e=expr; RPAR {e}
+  | CBOOL {}
+  | CINT {}
+  | CSTR {}
+  | IDENT {}
+  | LP; bexpr; RP {}
+  | BLOCK; COMMA; block; END {}
+  | LAM; funbody {}
+  | CASES; LP; typ; RP; bexpr; ublock; branchstar {}
+  | caller; LP; bexprstar {}
+  | FOR; caller; LP; fromstar; ARROW; typ; ublock; block; END {}
 
-col:
-  | BLACK {Turtle.black}
-  | WHITE {Turtle.white}
-  | RED {Turtle.red}
-  | GREEN {Turtle.green}
-  | BLUE {Turtle.blue}
-;
+fromstar:
+  | RP {}
+  | from; RP {}
+  | from; COMMA; fromstar {}
+
+bexprstar:
+  | RP {}
+  | bexpr; RP {}
+  | bexpr; COMMA; bexprstar {}
+
+branchstar:
+  | END {}
+  | branch; branchstar {}
+
+caller:
+  | IDENT {}
+  | caller; LP; bexprstar {}
+
+from:
+  param; FROM; bexpr {}
