@@ -59,6 +59,10 @@ rule next_tokens = parse
   | blank "<=" blank   { [CMP Ble] }
   | blank ">"  blank   { [CMP Bgt] }
   | blank ">=" blank   { [CMP Bge] }
+  | ')' blank '(' {raise (Lexing_error("Illegal blank inserted"))}
+  | ident blank '(' {raise (Lexing_error("Illegal blank inserted"))}
+  | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))}
+  | blank {next_token lexbuf}
   | '('     { [LP] }
   | ')'     { [RP] }
   | '['     { [LSQ] }
@@ -70,7 +74,7 @@ rule next_tokens = parse
               with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
   | '\''     { [CST (Cstring (string1 lexbuf))] }
   | '"'     { [CST (Cstring (string2 lexbuf))] }
-  | eof     { NEWLINE :: unindent 0 @ [EOF] }
+  | eof     { NEWLINE :: unindent 0 @ [EOF] } 
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 and indentation = parse
