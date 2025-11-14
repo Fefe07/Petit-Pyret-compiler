@@ -33,15 +33,10 @@
 %%
 
 file:
-| NEWLINE? dl = list(def) b = nonempty_list(stmt) NEWLINE? EOF
-    { dl, Sblock b }
+| l = list(stmt) EOF
+    {l}
 ;
 
-def:
-| DEF f = ident LP x = separated_list(COMMA, ident) RP
-  COLON s = suite
-    { f, x, s }
-;
 
 expr:
 | c = CST

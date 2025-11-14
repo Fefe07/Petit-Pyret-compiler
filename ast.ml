@@ -1,5 +1,5 @@
 
-(* Arbres de syntaxe abstraite de Mini-Python *)
+(* Arbres de syntaxe abstraite de Mini-Python
 
 type ident = string
 
@@ -41,4 +41,10 @@ and stmt =
 and def = ident * ident list * stmt
 
 and file = def list * stmt
+ *)
+
+type binop =
+ | Badd | Bsub | Bmul | Bdiv           (* + - * /  *)
+ | Beq | Bneq | Blt | Ble | Bgt | Bge  (* == <> < <= > >= *)
+ | Band | Bor                          (* && || *)
 

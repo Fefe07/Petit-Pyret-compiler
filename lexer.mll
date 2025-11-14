@@ -40,26 +40,24 @@ let letter = ['a'-'z' 'A'-'Z' '_']
 let digit = ['0'-'9']
 let ident = letter ('-'* (letter | digit )+)*
 let integer = (-|+)? digit+
-let space = ' ' | '\t'
-let comment = "#" [^'\n']*
+let space = ' ' | '\t' | '\n'
 
 rule next_tokens = parse
   | '\n'    { new_line lexbuf; update_stack (indentation lexbuf) }
-  | (space | comment)+
-            { next_tokens lexbuf }
+  | "#|" { comment lexbuf ; next_token lexbuf} (* Ici le commentaire n'est PAS un blanc *)
   | ident as id { [id_or_kwd id] }
-  | '+'     { [PLUS] }
-  | '-'     { [MINUS] }
-  | '*'     { [TIMES] }
-  | "//"    { [DIV] }
-  | '%'     { [MOD] }
-  | '='     { [EQUAL] }
-  | "=="    { [CMP Beq] }
-  | "!="    { [CMP Bneq] }
-  | "<"     { [CMP Blt] }
-  | "<="    { [CMP Ble] }
-  | ">"     { [CMP Bgt] }
-  | ">="    { [CMP Bge] }
+  | space+ '+'  space+     { [PLUS] }
+  | space+ '-'  space+    { [MINUS] }
+  | space+ '*'  space+    { [TIMES] }
+  | space+ "//" space+  { [DIV] }
+  | space+ '%'  space+   { [MOD] }
+  | space+ '='  space+   { [EQUAL] }
+  | space+ "==" space+  { [CMP Beq] }
+  | space+ "!=" space+   { [CMP Bneq] }
+  | space+ "<"  space+   { [CMP Blt] }
+  | space+ "<=" space+   { [CMP Ble] }
+  | space+ ">"  space+   { [CMP Bgt] }
+  | space+ ">=" space+   { [CMP Bge] }
   | '('     { [LP] }
   | ')'     { [RP] }
   | '['     { [LSQ] }
@@ -97,6 +95,12 @@ and string = parse
 	string lexbuf }
   | eof
       { raise (Lexing_error "unterminated string") }
+
+and comment = parse
+| "|#" {}
+| "#|" {comment lexbuf ; comment lexbuf}
+| _ -> {comment lexbuf}
+
 
 {
 
