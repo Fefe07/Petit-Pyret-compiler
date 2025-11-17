@@ -1,28 +1,22 @@
-
-/* Analyseur syntaxique pour Mini-Python */
+/* Analyseur syntaxique pour petit-Pyret */
 
 %{
   open Ast
+
 %}
 
-%token <Ast.constant> CST
+/* Déclaration des tokens */
+
+%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW
 %token <Ast.binop> CMP
-%token <string> IDENT
-%token DEF IF ELSE RETURN PRINT FOR IN AND OR NOT
-%token EOF
-%token LP RP LSQ RSQ COMMA EQUAL COLON BEGIN END NEWLINE
-%token PLUS MINUS TIMES DIV MOD
+%token <int> CINT
+%token <string> CSTR IDENT
+%token <bool> CBOOL
 
-/* Définitions des priorités et associativités des tokens */
 
-%left OR
-%left AND
-%nonassoc NOT
-%nonassoc CMP
-%left PLUS MINUS
-%left TIMES DIV MOD
-%nonassoc unary_minus
-%nonassoc LSQ
+%left PLUS MINUS TIMES DIV
+%nonassoc IF
+%nonassoc ELSE
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -32,77 +26,89 @@
 
 %%
 
+/* Règles de grammaire */
+
 file:
-| l = list(stmt) EOF
-    {l}
-;
+  | s = stmt*; EOF
+    { }
 
-
-expr:
-| c = CST
-    { Ecst c }
-| id = ident
-    { Eident id }
-| e1 = expr LSQ e2 = expr RSQ
-    { Eget (e1, e2) }
-| MINUS e1 = expr %prec unary_minus
-    { Eunop (Uneg, e1) }
-| NOT e1 = expr
-    { Eunop (Unot, e1) }
-| e1 = expr o = binop e2 = expr
-    { Ebinop (o, e1, e2) }
-| f = ident LP e = separated_list(COMMA, expr) RP
-    { Ecall (f, e) }
-| LSQ l = separated_list(COMMA, expr) RSQ
-    { Elist l }
-| LP e = expr RP
-    { e }
-;
-
-suite:
-| s = simple_stmt NEWLINE
-    { s }
-| NEWLINE BEGIN l = nonempty_list(stmt) END
-    { Sblock l }
-;
+block:
+  | s = stmt+ {}
 
 stmt:
-| s = simple_stmt NEWLINE
-    { s }
-| IF c = expr COLON s = suite
-    { Sif (c, s, Sblock []) }
-| IF c = expr COLON s1 = suite ELSE COLON s2 = suite
-    { Sif (c, s1, s2) }
-| FOR x = ident IN e = expr COLON s = suite
-    { Sfor (x, e, s) }
-;
+  | FUN; id = ident; funbody {}
+  | VAR; id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
+  | id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
+  | VAR; id = IDENT; EQUAL; bexpr {}
+  | id = IDENT; EQUAL; bexpr {}
+  | id = IDENT; DEF; bexpr {}
+  | bexpr {}
 
-simple_stmt:
-| RETURN e = expr
-    { Sreturn e }
-| id = ident EQUAL e = expr
-    { Sassign (id, e) }
-| e1 = expr LSQ e2 = expr RSQ EQUAL e3 = expr
-    { Sset (e1, e2, e3) }
-| PRINT LP e = expr RP
-    { Sprint e }
-| e = expr
-    { Seval e }
-;
+funbody:
+  | LP; p = funpar; ARROW; t = typ; ublock; block; END {}
 
-%inline binop:
-| PLUS  { Badd }
-| MINUS { Bsub }
-| TIMES { Bmul }
-| DIV   { Bdiv }
-| MOD   { Bmod }
-| c=CMP { c    }
-| AND   { Band }
-| OR    { Bor  }
-;
+funpar:
+  | RP {[]}
+  | p = param; COMMA; f = funpar {p::f}
+  | p = param; RP {[p]}
 
-ident:
-  id = IDENT { id }
-;
+param:
+  | id = IDENT; DBLCOLUMN; t = typ {}
+
+ublock:
+  | COLUMN {}
+  | block; COLUMN {}
 
 
+typ:
+  | id = IDENT {}
+  | LP; typestar; typ; RP {}
+
+typestar:
+  | ARROW {[]}
+  | t = typ; ARROW {[t]}
+  | t = typ; COMMA; ts = typestar [t::ts]
+
+bexpr:
+  | expr {}
+  | bexpr; binop; expr {}
+
+binop:
+  | CMP {}
+  | PLUS {}
+  | MINUS {}
+  | TIMES {}
+  | DIV {}
+
+expr:
+  | CBOOL {}
+  | CINT {}
+  | CSTR {}
+  | IDENT {}
+  | LP; bexpr; RP {}
+  | BLOCK; COMMA; block; END {}
+  | LAM; funbody {}
+  | CASES; LP; typ; RP; bexpr; ublock; branchstar {}
+  | caller; LP; bexprstar {}
+  | FOR; caller; LP; fromstar; ARROW; typ; ublock; block; END {}
+
+fromstar:
+  | RP {}
+  | from; RP {}
+  | from; COMMA; fromstar {}
+
+bexprstar:
+  | RP {}
+  | bexpr; RP {}
+  | bexpr; COMMA; bexprstar {}
+
+branchstar:
+  | END {}
+  | branch; branchstar {}
+
+caller:
+  | IDENT {}
+  | caller; LP; bexprstar {}
+
+from:
+  param; FROM; bexpr {}
