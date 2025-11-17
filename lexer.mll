@@ -40,34 +40,38 @@ let letter = ['a'-'z' 'A'-'Z' '_']
 let digit = ['0'-'9']
 let ident = letter ('-'* (letter | digit )+)*
 let integer = (-|+)? digit+
-let space = ' ' | '\t'
-let comment = "#" [^'\n']*
+let space = ' ' | '\t' | '\n'
+let blank = space +
 
 rule next_tokens = parse
   | '\n'    { new_line lexbuf; update_stack (indentation lexbuf) }
-  | (space | comment)+
-            { next_tokens lexbuf }
+  | "#|" { comment lexbuf ; next_token lexbuf} (* Ici le commentaire n'est PAS un blanc *)
   | ident as id { [id_or_kwd id] }
-  | '+'     { [PLUS] }
-  | '-'     { [MINUS] }
-  | '*'     { [TIMES] }
-  | "//"    { [DIV] }
-  | '%'     { [MOD] }
-  | '='     { [EQUAL] }
-  | "=="    { [CMP Beq] }
-  | "!="    { [CMP Bneq] }
-  | "<"     { [CMP Blt] }
-  | "<="    { [CMP Ble] }
-  | ">"     { [CMP Bgt] }
-  | ">="    { [CMP Bge] }
+  | blank '+'  blank     { [PLUS] }
+  | blank '-'  blank    { [MINUS] }
+  | blank '*'  blank    { [TIMES] }
+  | blank "//" blank  { [DIV] }
+  | blank '%'  blank   { [MOD] }
+  | blank '='  blank   { [EQUAL] }
+  | blank "==" blank   { [CMP Beq] }
+  | blank "!=" blank   { [CMP Bneq] }
+  | blank "<"  blank   { [CMP Blt] }
+  | blank "<=" blank   { [CMP Ble] }
+  | blank ">"  blank   { [CMP Bgt] }
+  | blank ">=" blank   { [CMP Bge] }
+  | ')' blank '(' {raise (Lexing_error("Illegal blank inserted"))}
+  | ident blank '(' {raise (Lexing_error("Illegal blank inserted"))}
+  | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))}
+  | blank {next_token lexbuf}
   | '('     { [LP] }
   | ','     { [COMMA] }
   | ':'     { [COLON] }
   | integer as s
             { try [CST (Cint (int_of_string s))]
               with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
-  | '"'     { [CST (Cstring (string lexbuf))] }
-  | eof     { NEWLINE :: unindent 0 @ [EOF] }
+  | '\''     { [CST (Cstring (string1 lexbuf))] }
+  | '"'     { [CST (Cstring (string2 lexbuf))] }
+  | eof     { NEWLINE :: unindent 0 @ [EOF] } 
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 and indentation = parse
@@ -78,22 +82,64 @@ and indentation = parse
   | space* eof
       { 0 }
 
-and string = parse
-  | '"'
+
+and string1 = parse
+  | '\'' 
       { let s = Buffer.contents string_buffer in
 	Buffer.reset string_buffer;
 	s }
   | "\\n"
       { Buffer.add_char string_buffer '\n';
-	string lexbuf }
+	string2 lexbuf }
+  | "\\t"
+      { Buffer.add_char string_buffer '\t';
+	string2 lexbuf }
   | "\\\""
       { Buffer.add_char string_buffer '"';
-	string lexbuf }
+	string2 lexbuf }
+  | "\\\'"
+      { Buffer.add_char string_buffer '\'';
+	string2 lexbuf }
+  | "\\\\" 
+      { Bufer.add_char string_buffer '\\' ; string lexbuf}
+  | '\n' {raise(Lexing_error ("Newlines forbidden in strings, use \\n instead"))}
   | _ as c
       { Buffer.add_char string_buffer c;
 	string lexbuf }
   | eof
       { raise (Lexing_error "unterminated string") }
+
+and string2 = parse
+  | '"' 
+      { let s = Buffer.contents string_buffer in
+	Buffer.reset string_buffer;
+	s }
+  | "\\n"
+      { Buffer.add_char string_buffer '\n';
+	string2 lexbuf }
+  | "\\t"
+      { Buffer.add_char string_buffer '\t';
+	string2 lexbuf }
+  | "\\\""
+      { Buffer.add_char string_buffer '"';
+	string2 lexbuf }
+  | "\\\'"
+      { Buffer.add_char string_buffer '\'';
+	string2 lexbuf }
+  | "\\\\" 
+      { Bufer.add_char string_buffer '\\' ; string lexbuf}
+  | '\n' {raise(Lexing_error ("Newlines forbidden in strings, use \\n instead"))}
+  | _ as c
+      { Buffer.add_char string_buffer c;
+	string lexbuf }
+  | eof
+      { raise (Lexing_error "unterminated string") }
+
+and comment = parse
+| "|#" {}
+| "#|" {comment lexbuf ; comment lexbuf}
+| _ -> {comment lexbuf}
+
 
 {
 
