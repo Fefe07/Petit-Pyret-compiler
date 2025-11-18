@@ -11,13 +11,19 @@
   let id_or_kwd =
     let h = Hashtbl.create 32 in
     List.iter (fun (s, tok) -> Hashtbl.add h s tok)
-      ["def", DEF; "if", IF; "else", ELSE;
-       "return", RETURN; "print", PRINT;
-       "for", FOR; "in", IN;
-       "and", AND; "or", OR; "not", NOT;
-       "True", CST (Cbool true);
-       "False", CST (Cbool false);
-       "None", CST Cnone;];
+      ["lam",LAM ; "if", IF; "else", ELSE;
+       "return", RETURN;
+       "for", FOR;
+       "and", AND; "or", OR;
+       "true",Cbool true;
+       "false", Cbool false;
+       "block", BLOCK;
+       "cases", CASES;
+       "end", END;
+       "from", FROM ;
+       "fun", FUN ;
+       "var", VAR 
+       ];
    fun s -> try Hashtbl.find h s with Not_found -> IDENT s
 
   let string_buffer = Buffer.create 1024
@@ -45,24 +51,13 @@ let blank = space +
 
 rule next_tokens = parse
   | '\n'    { new_line lexbuf; update_stack (indentation lexbuf) }
-  | "#|" { comment lexbuf ; next_token lexbuf} (* Ici le commentaire n'est PAS un blanc *)
+  | "#|" { comment lexbuf ; next_token_blank lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *)
+  | '#' {comment_line lexbuf} 
   | ident as id { [id_or_kwd id] }
-  | blank '+'  blank     { [PLUS] }
-  | blank '-'  blank    { [MINUS] }
-  | blank '*'  blank    { [TIMES] }
-  | blank "//" blank  { [DIV] }
-  | blank '%'  blank   { [MOD] }
-  | blank '='  blank   { [EQUAL] }
-  | blank "==" blank   { [CMP Beq] }
-  | blank "!=" blank   { [CMP Bneq] }
-  | blank "<"  blank   { [CMP Blt] }
-  | blank "<=" blank   { [CMP Ble] }
-  | blank ">"  blank   { [CMP Bgt] }
-  | blank ">=" blank   { [CMP Bge] }
+  | blank { next_token_blank lexbuf}
   | ')' blank '(' {raise (Lexing_error("Illegal blank inserted"))}
   | ident blank '(' {raise (Lexing_error("Illegal blank inserted"))}
   | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))}
-  | blank {next_token lexbuf}
   | '('     { [LP] }
   | ','     { [COMMA] }
   | ':'     { [COLON] }
@@ -73,6 +68,22 @@ rule next_tokens = parse
   | '"'     { [CST (Cstring (string2 lexbuf))] }
   | eof     { NEWLINE :: unindent 0 @ [EOF] } 
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
+
+and next_token_blank = parse 
+  | '+'  blank     { [PLUS] }
+  | '-'  blank    { [MINUS] }
+  | '*'  blank    { [TIMES] }
+  | "//" blank  { [DIV] }
+  | '%'  blank   { [MOD] }
+  | '='  blank   { [EQUAL] }
+  | "==" blank   { [CMP Beq] }
+  | "!=" blank   { [CMP Bneq] }
+  | "<"  blank   { [CMP Blt] }
+  | "<=" blank   { [CMP Ble] }
+  | ">"  blank   { [CMP Bgt] }
+  | ">=" blank   { [CMP Bge] }
+  | _ {next_tokens lexbuf}
+
 
 and indentation = parse
   | (space | comment)* '\n'
@@ -139,6 +150,10 @@ and comment = parse
 | "|#" {}
 | "#|" {comment lexbuf ; comment lexbuf}
 | _ -> {comment lexbuf}
+
+and comment_line = parse 
+| '\n' {next_token_blank lexbuf}
+| _ { comment_line lexbuf}
 
 
 {

@@ -1,4 +1,4 @@
-/* Analyseur syntaxique pour petit-Pyret */
+  /* Analyseur syntaxique pour petit-Pyret */
 
 %{
   open Ast
