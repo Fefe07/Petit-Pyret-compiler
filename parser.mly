@@ -7,8 +7,8 @@
 
 /* Déclaration des tokens */
 
-%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW
-%token <Ast.binop> CMP
+%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLON DBLCOLON DEF ARROW LEFT_CHEV RIGHT_CHEV
+%token <Ast.binop> CMPblock
 %token <int> CINT
 %token <string> CSTR IDENT
 %token <bool> CBOOL
@@ -37,8 +37,8 @@ block:
 
 stmt:
   | FUN; id = ident; funbody {}
-  | VAR; id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
-  | id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
+  | VAR; id = IDENT; LP; DBLCOLON; t = typ; RP; EQUAL; bexpr {}
+  | id = IDENT; LP; DBLCOLON; t = typ; RP; EQUAL; bexpr {}
   | VAR; id = IDENT; EQUAL; bexpr {}
   | id = IDENT; EQUAL; bexpr {}
   | id = IDENT; DEF; bexpr {}
@@ -53,11 +53,11 @@ funpar:
   | p = param; RP {[p]}
 
 param:
-  | id = IDENT; DBLCOLUMN; t = typ {}
+  | id = IDENT; DBLCOLON; t = typ {}
 
 ublock:
-  | COLUMN {}
-  | block; COLUMN {}
+  | COLON {}
+  | block; COLON {}
 
 
 typ:

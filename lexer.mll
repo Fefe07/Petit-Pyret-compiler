@@ -1,6 +1,8 @@
 
 (* Analyseur lexical pour Petit-Pyret *)
 
+(* TODO : fonctions polymorphes *)
+
 {
   open Lexing
   open Ast
@@ -9,7 +11,7 @@
   exception Lexing_error of string
 
   let id_or_kwd =
-    let h = Hashtbl.create 32 in
+    let h = Hashtbl.create 42 in
     List.iter (fun (s, tok) -> Hashtbl.add h s tok)
       ["lam",LAM ; "if", IF; "else", ELSE;
        "return", RETURN;
@@ -51,13 +53,17 @@ let blank = space +
 
 rule next_tokens = parse
   | '\n'    { new_line lexbuf; update_stack (indentation lexbuf) }
-  | "#|" { comment lexbuf ; next_token_blank lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *)
+  | "#|" { comment lexbuf ; next_token_blank lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *) (* Fixed : c'est un blanc avant, mais pas après*)
   | '#' {comment_line lexbuf} 
-  | ident as id { [id_or_kwd id] }
   | blank { next_token_blank lexbuf}
-  | ')' blank '(' {raise (Lexing_error("Illegal blank inserted"))}
-  | ident blank '(' {raise (Lexing_error("Illegal blank inserted"))}
-  | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))}
+  | '<' {[LEFT_CHEV]}
+  | '>' (blank | '#') {raise(Lexing_error "Illegal blank between '>' and the '(' of type annotations")}
+  | '>' {[RIGHT_CHEV]}
+  (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
+  | "block:" { [BLOCK; COLON]} (* COLON est toujours un lexeme *)
+  | "else:" {[ELSE; COLON]}
+  | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
+  | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")}
   | '('     { [LP] }
   | ','     { [COMMA] }
   | ':'     { [COLON] }
@@ -67,6 +73,7 @@ rule next_tokens = parse
   | '\''     { [CST (Cstring (string1 lexbuf))] }
   | '"'     { [CST (Cstring (string2 lexbuf))] }
   | eof     { NEWLINE :: unindent 0 @ [EOF] } 
+  | ident as id { [id_or_kwd id] }
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 and next_token_blank = parse 
@@ -82,6 +89,8 @@ and next_token_blank = parse
   | "<=" blank   { [CMP Ble] }
   | ">"  blank   { [CMP Bgt] }
   | ">=" blank   { [CMP Bge] }
+  | '(' {raise (Lexing_error("Illegal blank inserted"))} 
+  (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
   | _ {next_tokens lexbuf}
 
 
