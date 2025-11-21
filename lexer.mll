@@ -55,10 +55,11 @@ rule next_tokens = parse
   | '\n'    { new_line lexbuf; update_stack (indentation lexbuf) }
   | "#|" { comment lexbuf ; next_token_blank lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *) (* Fixed : c'est un blanc avant, mais pas après*)
   | '#' {comment_line lexbuf} 
-  | blank { next_token_blank lexbuf}
+  | blank {next_token_blank lexbuf}
   | '<' {[LEFT_CHEV]}
   | '>' (blank | '#') {raise(Lexing_error "Illegal blank between '>' and the '(' of type annotations")}
   | '>' {[RIGHT_CHEV]}
+  | "->" {[ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
   | "block:" { [BLOCK; COLON]} (* COLON est toujours un lexeme *)
   | "else:" {[ELSE; COLON]}
@@ -75,6 +76,7 @@ rule next_tokens = parse
   | eof     { NEWLINE :: unindent 0 @ [EOF] } 
   | ident as id { [id_or_kwd id] }
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
+
 
 and next_token_blank = parse 
   | '+'  blank     { [PLUS] }
