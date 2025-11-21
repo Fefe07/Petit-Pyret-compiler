@@ -22,27 +22,30 @@
 %start file
 
 /* Type des valeurs renvoyées par l'analyseur syntaxique */
-%type <Ast.file> file
+%type <Ast.block> file
+%type <Ast.stmt> stmt
+%type <Ast.block> block
+%type <Ast.expr> bexpr
+%type <Ast.types> typ
 
-%%
 
 /* Règles de grammaire */
 
 file:
   | s = stmt*; EOF
-    { }
+    {s}
 
 block:
-  | s = stmt+ {}
+  | s = stmt+ {s}
 
 stmt:
   | FUN; id = ident; funbody {}
-  | VAR; id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
-  | id = IDENT; LP; DBLCOLUMN; t = typ; RP; EQUAL; bexpr {}
-  | VAR; id = IDENT; EQUAL; bexpr {}
-  | id = IDENT; EQUAL; bexpr {}
+  | VAR; id = IDENT; DBLCOLUMN; t = typ; EQUAL; e = bexpr {Var (id, t, e)}
+  | id = IDENT;  DBLCOLUMN; t = typ;  EQUAL; e = bexpr {Var (id, t, e)}
+  | VAR; id = IDENT; EQUAL; e = bexpr {Var (id, Taundef, e)}
+  | id = IDENT; EQUAL; e = bexpr {Var (id, Taundef, e)}
   | id = IDENT; DEF; bexpr {}
-  | bexpr {}
+  | b = bexpr {Sexpr b}
 
 funbody:
   | LP; p = funpar; ARROW; t = typ; ublock; block; END {}
@@ -70,8 +73,8 @@ typestar:
   | t = typ; COMMA; ts = typestar [t::ts]
 
 bexpr:
-  | expr {}
-  | bexpr; binop; expr {}
+  | e = expr {e}
+  | e1 = bexpr; b = binop; e2 = bexpr {Bexpr (b, e1, e2)}
 
 binop:
   | CMP {}
