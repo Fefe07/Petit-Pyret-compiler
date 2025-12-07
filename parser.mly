@@ -53,7 +53,7 @@ block:
   | s1 = stmt*; s2 = stmt_final {s@[s2]}
 
 stmt_init:
-  | FUN; id = ident; Funbody (p,t,b) = funbody {Sfun (id,p,t,b)}
+  | FUN; id = IDENT; x = funbody {let Funbody (p,t,b) = x in Sfun (id,p,t,b)}
   | VAR; id = IDENT; DBLCOLUMN; t = typ; EQUAL; e = bexpr {Svar (id, t, e)}
   | id = IDENT;  DBLCOLUMN; t = typ;  EQUAL; e = bexpr {Svar (id, t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
@@ -79,7 +79,7 @@ ublock:
   | BLOCK; COLUMN ; b = block {b}
 
 simpleblock:
-  | s = finblock {[s]}
+  | s = stmt_final {[s]}
   | s1 = stmt_init; s2 = simpleblock {s1::s2}
 
 typ:

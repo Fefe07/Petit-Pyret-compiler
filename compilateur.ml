@@ -6,13 +6,15 @@ let parse_only = ref false
 
 (* Nom du fichier source *)
 let ifile = ref ""
-
 let set_file f s = f := s
 
 (* Les options du compilateur que l'on affiche avec --help *)
 let options =
-  ["--parse-only", Arg.Set parse_only,
-   "  Pour ne faire uniquement que la phase d'analyse syntaxique"]
+  [
+    ( "--parse-only",
+      Arg.Set parse_only,
+      "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
+  ]
 
 let usage = "usage: mini-turtle [option] file.logo"
 
@@ -20,21 +22,22 @@ let usage = "usage: mini-turtle [option] file.logo"
 let localisation pos =
   let l = pos.pos_lnum in
   let c = pos.pos_cnum - pos.pos_bol + 1 in
-  eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l (c-1) c
+  eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l (c - 1) c
 
 let () =
   (* Parsing de la ligne de commande *)
   Arg.parse options (set_file ifile) usage;
 
   (* On vérifie que le nom du fichier source a bien été indiqué *)
-  if !ifile="" then begin eprintf "Aucun fichier à compiler\n@?"; exit 1 end;
+  if !ifile = "" then (
+    eprintf "Aucun fichier à compiler\n@?";
+    exit 1);
 
   (* Ce fichier doit avoir l'extension .logo *)
-  if not (Filename.check_suffix !ifile ".logo") then begin
+  if not (Filename.check_suffix !ifile ".logo") then (
     eprintf "Le fichier d'entrée doit avoir l'extension .logo\n@?";
     Arg.usage options usage;
-    exit 1
-  end;
+    exit 1);
 
   (* Ouverture du fichier source en lecture *)
   let f = open_in !ifile in
@@ -52,22 +55,21 @@ let () =
     close_in f;
 
     (* On s'arrête ici si on ne veut faire que le parsing *)
-    if !parse_only then exit 0;
-    else exit 0;
-
+    if !parse_only then exit 0
   with
-    | Lexer.Lexing_error c ->
-	(* Erreur lexicale. On récupère sa position absolue et
+  | Lexer.Lexing_error c ->
+      (* Erreur lexicale. On récupère sa position absolue et
 	   on la convertit en numéro de ligne *)
-	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur lexicale: %s@." c;
-	exit 1
-    | Parser.Error ->
-	(* Erreur syntaxique. On récupère sa position absolue et on la
+      localisation (Lexing.lexeme_start_p buf);
+      eprintf "Erreur lexicale: %s@." c;
+      exit 1
+  | Parser.Error ->
+      (* Erreur syntaxique. On récupère sa position absolue et on la
 	   convertit en numéro de ligne *)
-	localisation (Lexing.lexeme_start_p buf);
-	eprintf "Erreur syntaxique@.";
-	exit 1(*
+      localisation (Lexing.lexeme_start_p buf);
+      eprintf "Erreur syntaxique@.";
+      exit 1
+(*
     | Interp.Error s->
 	(* Erreur pendant l'interprétation *)
 	eprintf "Erreur : %s@." s;
