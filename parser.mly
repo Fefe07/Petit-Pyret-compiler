@@ -40,7 +40,7 @@
 %type <Ast.expr> expr
 
 /* Règles de grammaire */
-
+%%
 file:
   | s = stmt*; EOF
     {s}
