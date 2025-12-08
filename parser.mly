@@ -7,16 +7,11 @@
 
 /* Déclaration des tokens */
 
-%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW DOUBLEARROW PIPE
-%token <Ast.binop> CMP
+%token EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP COMMA COLUMN DBLCOLUMN DEF ARROW DOUBLEARROW PIPE
+%token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
 %token <bool> CBOOL
-
-
-%left PLUS MINUS TIMES DIV
-%nonassoc IF
-%nonassoc ELSE
 
 /* Point d'entrée de la grammaire */
 %start file
@@ -35,7 +30,6 @@
 %type <Ast.stmt> stmt_final
 %type <Ast.stmt> stmt_init
 %type <Ast.funbody> funbody
-%type <Ast.binop> binop
 %type <Ast.expr> expr
 %type <Ast.branch> branch
 %type <Ast.branch list> branchstar
@@ -99,14 +93,7 @@ typestar:
 
 bexpr:
   | e = expr {e}
-  | e1 = bexpr; b = binop; e2 = bexpr {Bexpr (b, e1, e2)}
-
-binop:
-  | b = CMP {b}
-  | PLUS {Badd}
-  | MINUS {Bsub}
-  | TIMES {Bmul}
-  | DIV {Bdiv}
+  | e1 = bexpr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
 
 expr:
   | b = CBOOL {Ecst (Cbool b)}

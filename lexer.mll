@@ -16,7 +16,7 @@
       ["lam",LAM ; "if", IF; "else", ELSE;
        "return", RETURN;
        "for", FOR;
-       "and", AND; "or", OR;
+       "and", BINOP Band; "or", BINOP Bor;
        "true",Cbool true;
        "false", Cbool false;
        "block", BLOCK;
@@ -79,18 +79,17 @@ rule next_tokens = parse
 
 
 and next_token_blank = parse 
-  | '+'  blank     { [PLUS] }
-  | '-'  blank    { [MINUS] }
-  | '*'  blank    { [TIMES] }
-  | "//" blank  { [DIV] }
-  | '%'  blank   { [MOD] }
+  | '+'  blank     { [BINOP Badd] }
+  | '-'  blank    { [BINOP Bsub] }
+  | '*'  blank    { [BINOP Bmul] }
+  | "//" blank  { [BINOP Bdiv] }
   | '='  blank   { [EQUAL] }
-  | "==" blank   { [CMP Beq] }
-  | "!=" blank   { [CMP Bneq] }
-  | "<"  blank   { [CMP Blt] }
-  | "<=" blank   { [CMP Ble] }
-  | ">"  blank   { [CMP Bgt] }
-  | ">=" blank   { [CMP Bge] }
+  | "==" blank   { [BINOP Beq] }
+  | "!=" blank   { [BINOP Bneq] }
+  | "<"  blank   { [BINOP Blt] }
+  | "<=" blank   { [BINOP Ble] }
+  | ">"  blank   { [BINOP Bgt] }
+  | ">=" blank   { [BINOP Bge] }
   | '(' {raise (Lexing_error("Illegal blank inserted"))} 
   (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
   | _ {next_tokens lexbuf}
