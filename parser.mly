@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW
+%token EOF AND BLOCK CASES ELSE END FALSE FOR FROM FUN IF LAM OR TRUE VAR PLUS MINUS TIMES DIV EQUAL LP RP LSQ RSQ COMMA COLUMN DBLCOLUMN DEF ARROW DOUBLEARROW PIPE
 %token <Ast.binop> CMP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -31,33 +31,40 @@
 %type <Ast.param> param
 %type <Ast.param list> funpar
 %type <Ast.block> ublock
+%type <Ast.block> simpleblock
 %type <Ast.stmt> stmt_final
 %type <Ast.stmt> stmt_init
 %type <Ast.funbody> funbody
-%type <Ast.param list> funparam
-%type <Ast.param> param
 %type <Ast.binop> binop
 %type <Ast.expr> expr
+%type <Ast.branch> branch
+%type <Ast.branch list> branchstar
+%type <Ast.branch list> branches
+%type <Ast.branch> simplebranch
+%type <Ast.branch list> simplebranchstar
+%type <Ast.expr> elif
+%type <Ast.expr> simpleelif
+%type <Ast.expr> ifblock
+%type <Ast.ident list> identstar
 
 /* Règles de grammaire */
 %%
 file:
-  | s = stmt*; EOF
-    {s}
+  | s = stmt*; EOF {s}
 
 stmt_final:
   | id = IDENT; DEF; e = bexpr {Saffect (id, e)}
   | b = bexpr {Sexpr b}
 
 block:
-  | s1 = stmt*; s2 = stmt_final {s@[s2]}
+  | s1 = stmt*; s2 = stmt_final {s1@[s2]}
 
 stmt_init:
-  | FUN; id = IDENT; x = funbody {let Funbody (p,t,b) = x in Sfun (id,p,t,b)}
-  | VAR; id = IDENT; DBLCOLUMN; t = typ; EQUAL; e = bexpr {Svar (id, t, e)}
-  | id = IDENT;  DBLCOLUMN; t = typ;  EQUAL; e = bexpr {Svar (id, t, e)}
+  | FUN; id = IDENT; x = funbody {Sconst (id, Taundef, Elam x)}
+  | VAR; id = IDENT; DBLCOLUMN; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
-  | id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
+  | id = IDENT;  DBLCOLUMN; t = typ;  EQUAL; e = bexpr {Sconst (id, Ta t, e)}
+  | id = IDENT; EQUAL; e = bexpr {Sconst (id, Taundef, e)}
 
 stmt:
   | s = stmt_init {s}
@@ -72,7 +79,7 @@ funpar:
   | p = param; RP {[p]}
 
 param:
-  | id = IDENT; DBLCOLUMN; t = typ {}
+  | id = IDENT; DBLCOLUMN; t = typ {(id, Ta t)}
 
 ublock:
   | COLUMN ; b = simpleblock; {b}
@@ -102,16 +109,37 @@ binop:
   | DIV {Bdiv}
 
 expr:
-  | b = CBOOL {Cst (Cbool b)}
-  | i = CINT {Cst (Cint i)}
-  | s = CSTR {Cst (Cstr s)}
-  | id = IDENT {Var id}
+  | b = CBOOL {Ecst (Cbool b)}
+  | i = CINT {Ecst (Cint i)}
+  | s = CSTR {Ecst (Cstr s)}
+  | id = IDENT {Evar id}
   | LP; b = bexpr; RP {b}
-  | BLOCK; COMMA; b = block; END {Eblock b}
-  | LAM; funbody {}
-  | CASES; LP; typ; RP; bexpr; ublock; branchstar {}
-  | caller; LP; bexprstar {}
-  | FOR; caller; LP; fromstar; ARROW; typ; ublock; block; END {}
+  | BLOCK; COLUMN; b = block; END {Eblock b}
+  | LAM; f = funbody {Elam f}
+  | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
+  | c = caller; LP; b = bexprstar {Ecall (c,b)}
+  | FOR; caller; LP; fromstar; ARROW; typ; ublock; block; END {Ecst (Cbool true)}
+  | i = ifblock {i}
+
+ifblock:
+  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; BLOCK; COLUMN; bif = block; ELSE; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleelif {Eif (e, Eblock bif, belse)}
+  | IF; e = bexpr; BLOCK; COLUMN; bif = block; ELSE; belse = elif {Eif (e, Eblock bif, belse)}
+
+simpleelif:
+  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLUMN; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+
+elif:
+  | IF; e = bexpr; COLUMN; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLUMN; bif = block; ELSE; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLUMN; bif = block; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+
+branches:
+  | COLUMN; b = simplebranchstar {b}
+  | BLOCK; COLUMN; b = branchstar {b}
 
 fromstar:
   | RP {}
@@ -119,17 +147,34 @@ fromstar:
   | from; COMMA; fromstar {}
 
 bexprstar:
-  | RP {}
-  | bexpr; RP {}
-  | bexpr; COMMA; bexprstar {}
+  | RP {[]}
+  | b = bexpr; RP {[b]}
+  | b = bexpr; COMMA; bs = bexprstar {b::bs}
+
+simplebranchstar:
+  | END {[]}
+  | b = simplebranch; blist = simplebranchstar {b::blist}
+
+simplebranch:
+  | PIPE; id = IDENT; DOUBLEARROW; b = simpleblock {Branch1 (id,b)}
+  | PIPE; id = IDENT; LP; idlist = identstar; DOUBLEARROW; b = simpleblock {Branch2 (id, idlist, b)}
 
 branchstar:
-  | END {}
-  | branch; branchstar {}
+  | END {[]}
+  | b = branch; blist = branchstar {b::blist}
+
+branch:
+  | PIPE; id = IDENT; DOUBLEARROW; b = block {Branch1 (id,b)}
+  | PIPE; id = IDENT; LP; idlist = identstar; DOUBLEARROW; b = block {Branch2 (id, idlist, b)}
+
+identstar:
+  | RP {[]}
+  | id = IDENT; RP {[id]}
+  | id = IDENT; COMMA; ids = identstar {id::ids}
 
 caller:
-  | IDENT {}
-  | caller; LP; bexprstar {}
+  | id = IDENT {Cvar id}
+  | c = caller; LP; b = bexprstar {Cfun (c,b)}
 
 from:
   param; FROM; bexpr {}
