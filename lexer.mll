@@ -14,11 +14,10 @@
     let h = Hashtbl.create 42 in
     List.iter (fun (s, tok) -> Hashtbl.add h s tok)
       ["lam",LAM ; "if", IF; "else", ELSE;
-       "return", RETURN;
        "for", FOR;
        "and", BINOP Band; "or", BINOP Bor;
-       "true",Cbool true;
-       "false", Cbool false;
+       "true",CBOOL true;
+       "false", CBOOL false;
        "block", BLOCK;
        "cases", CASES;
        "end", END;
@@ -96,7 +95,7 @@ and next_token_blank = parse
 
 
 and indentation = parse
-  | (space | comment)* '\n'
+  | (space(* | comment*))* '\n'
       { new_line lexbuf; indentation lexbuf }
   | space* as s
       { String.length s }
@@ -159,7 +158,7 @@ and string2 = parse
 and comment = parse
 | "|#" {}
 | "#|" {comment lexbuf ; comment lexbuf}
-| _ -> {comment lexbuf}
+| _ {comment lexbuf}
 
 and comment_line = parse 
 | '\n' {next_token_blank lexbuf}
