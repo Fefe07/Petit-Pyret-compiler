@@ -40,6 +40,8 @@
 %type <Ast.expr> simpleelif
 %type <Ast.expr> ifblock
 %type <Ast.ident list> identstar
+%type <Ast.param * Ast.expr> from
+%type <(Ast.param * Ast.expr) list> fromstar
 
 /* Règles de grammaire */
 %%
@@ -105,7 +107,10 @@ expr:
   | LAM; f = funbody {Elam f}
   | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
   | c = caller; LP; b = bexprstar {Ecall (c,b)}
-  | FOR; caller; LP; fromstar; ARROW; typ; ublock; block; END {Ecst (Cbool true)}
+  | FOR; c = caller; LP;  p = fromstar; ARROW; t = typ; b = ublock; END {
+    let parameters,expressions = List.split p in 
+    Ecall (c, (Elam (Funbody (parameters, t, b)))::expressions)
+  }
   | i = ifblock {i}
 
 ifblock:
@@ -129,9 +134,9 @@ branches:
   | BLOCK; COLUMN; b = branchstar {b}
 
 fromstar:
-  | RP {}
-  | from; RP {}
-  | from; COMMA; fromstar {}
+  | RP {[]}
+  | f = from; RP {[f]}
+  | f = from; COMMA; fs = fromstar {f::fs}
 
 bexprstar:
   | RP {[]}
@@ -164,4 +169,4 @@ caller:
   | c = caller; LP; b = bexprstar {Cfun (c,b)}
 
 from:
-  param; FROM; bexpr {}
+  p = param; FROM; b = bexpr {(p, b)}
