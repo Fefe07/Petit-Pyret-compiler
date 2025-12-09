@@ -1,11 +1,7 @@
 open Format
 open Lexing
 
-
 (* TODO : formater ce fichier selon l'énoncé *)
-
-
-
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
@@ -25,7 +21,7 @@ let options =
       "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
   ]
 
-let usage = "usage: pyretc [option] file.logo"
+let usage = "usage: pyretc [option] file.arr"
 
 (* localise une erreur en indiquant la ligne et la colonne *)
 let localisation pos =
@@ -42,9 +38,9 @@ let () =
     eprintf "Aucun fichier à compiler\n@?";
     exit 1);
 
-  (* Ce fichier doit avoir l'extension .logo *)
-  if not (Filename.check_suffix !ifile ".logo") then (
-    eprintf "Le fichier d'entrée doit avoir l'extension .logo\n@?";
+  (* Ce fichier doit avoir l'extension .arr *)
+  if not (Filename.check_suffix !ifile ".arr") then (
+    eprintf "Le fichier d'entrée doit avoir l'extension .arr\n@?";
     Arg.usage options usage;
     exit 1);
 

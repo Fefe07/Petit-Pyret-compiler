@@ -1,4 +1,4 @@
-all: compilateur.exe
+all: pyretc.exe
 
-compilateur.exe:
+pyretc.exe: lexer.mll parser.mly pyretc.ml
 	dune build
