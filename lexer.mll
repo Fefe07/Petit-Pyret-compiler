@@ -4,7 +4,7 @@
 (* TODO : fonctions polymorphes *)
 
 {
-  open Lexing
+  open Lexing (*Quoi ?!*)
   open Ast
   open Parser
 
@@ -29,6 +29,8 @@
 
   let string_buffer = Buffer.create 1024
 
+
+  (*A modifier !!!!! Pas besoin de produire ces lexèmes*)
   let stack = ref [0]  (* indentation stack *)
   let rec unindent n = match !stack with
     | m :: _ when m = n -> []
@@ -38,7 +40,7 @@
     match !stack with
     | m :: _ when m < n ->
       stack := n :: !stack;
-      [NEWLINE; BEGIN]
+      (*[NEWLINE; BEGIN]*)[]
     | _ ->
       NEWLINE :: unindent n
 }
@@ -68,10 +70,10 @@ rule next_tokens = parse
   | ','     { [COMMA] }
   | ':'     { [COLON] }
   | integer as s
-            { try [CST (Cint (int_of_string s))]
+            { try [CINT (int_of_string s)]
               with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
-  | '\''     { [CST (Cstring (string1 lexbuf))] }
-  | '"'     { [CST (Cstring (string2 lexbuf))] }
+  | '\''     { [CSTR (string1 lexbuf)] }
+  | '"'     { [CSTR (string2 lexbuf)] }
   | eof     { NEWLINE :: unindent 0 @ [EOF] } 
   | ident as id { [id_or_kwd id] }
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
@@ -102,7 +104,7 @@ and indentation = parse
   | space* eof
       { 0 }
 
-
+(* string1 is delimited with '' and string2 with ""  *)
 and string1 = parse
   | '\'' 
       { let s = Buffer.contents string_buffer in
@@ -110,22 +112,22 @@ and string1 = parse
 	s }
   | "\\n"
       { Buffer.add_char string_buffer '\n';
-	string2 lexbuf }
+	string1 lexbuf }
   | "\\t"
       { Buffer.add_char string_buffer '\t';
-	string2 lexbuf }
+	string1 lexbuf }
   | "\\\""
       { Buffer.add_char string_buffer '"';
-	string2 lexbuf }
+	string1 lexbuf }
   | "\\\'"
       { Buffer.add_char string_buffer '\'';
-	string2 lexbuf }
+	string1 lexbuf }
   | "\\\\" 
-      { Bufer.add_char string_buffer '\\' ; string lexbuf}
+      { Buffer.add_char string_buffer '\\' ; string1 lexbuf}
   | '\n' {raise(Lexing_error ("Newlines forbidden in strings, use \\n instead"))}
   | _ as c
       { Buffer.add_char string_buffer c;
-	string lexbuf }
+	string1 lexbuf }
   | eof
       { raise (Lexing_error "unterminated string") }
 
@@ -147,11 +149,11 @@ and string2 = parse
       { Buffer.add_char string_buffer '\'';
 	string2 lexbuf }
   | "\\\\" 
-      { Bufer.add_char string_buffer '\\' ; string lexbuf}
+      { Buffer.add_char string_buffer '\\' ; string2 lexbuf}
   | '\n' {raise(Lexing_error ("Newlines forbidden in strings, use \\n instead"))}
   | _ as c
       { Buffer.add_char string_buffer c;
-	string lexbuf }
+	string2 lexbuf }
   | eof
       { raise (Lexing_error "unterminated string") }
 

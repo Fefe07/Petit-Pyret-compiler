@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP COMMA COLUMN DBLCOLUMN DEF ARROW DOUBLEARROW PIPE
+%token LEFT_CHEV RIGHT_CHEV NEWLINE EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP COMMA COLON DBLCOLON DEF ARROW DOUBLEARROW PIPE
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -68,9 +68,9 @@ stmt_init:
   (*Function declaration*)
   | FUN; id = IDENT; x = funbody {Sconst (id, Taundef, Elam x)}
   (*Variable declaration*)
-  | VAR; id = IDENT; DBLCOLUMN; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
+  | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
-  | id = IDENT;  DBLCOLUMN; t = typ;  EQUAL; e = bexpr {Sconst (id, Ta t, e)}
+  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, Ta t, e)}
   | id = IDENT; EQUAL; e = bexpr {Sconst (id, Taundef, e)}
 
 stmt_final:
@@ -84,7 +84,7 @@ expr:
   | s = CSTR {Ecst (Cstr s)}
   | id = IDENT {Evar id}
   | LP; b = bexpr; RP {b}
-  | BLOCK; COLUMN; b = block; END {Eblock b}
+  | BLOCK; COLON; b = block; END {Eblock b}
   | LAM; f = funbody {Elam f}
   | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
   | c = caller; LP; b = bexprstar {Ecall (c,b)}
@@ -117,8 +117,8 @@ simpleblock:
   | s1 = stmt_init; s2 = simpleblock {s1::s2}
 
 ublock:
-  | COLUMN ; b = simpleblock; {b}
-  | BLOCK; COLUMN ; b = block {b}
+  | COLON ; b = simpleblock; {b}
+  | BLOCK; COLON ; b = block {b}
 
 
 funbody:
@@ -130,7 +130,7 @@ funpar:
   | p = param; RP {[p]}
 
 param:
-  | id = IDENT; DBLCOLUMN; t = typ {(id, Ta t)}
+  | id = IDENT; DBLCOLON; t = typ {(id, Ta t)}
 
 caller:
   | id = IDENT {Cvar id}
@@ -138,25 +138,25 @@ caller:
 
 
 ifblock:
-  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
-  | IF; e = bexpr; BLOCK; COLUMN; bif = block; ELSE; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
-  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleelif {Eif (e, Eblock bif, belse)}
-  | IF; e = bexpr; BLOCK; COLUMN; bif = block; ELSE; belse = elif {Eif (e, Eblock bif, belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e, Eblock bif, belse)}
+  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = elif {Eif (e, Eblock bif, belse)}
 
 elif:
-  | IF; e = bexpr; COLUMN; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLUMN; bif = block; ELSE; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLUMN; bif = block; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLON; bif = block; ELSE; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = block; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
 
 simpleelif:
-  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLUMN; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLUMN; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
 
 
 branches:
-  | COLUMN; b = simplebranchstar {b}
-  | BLOCK; COLUMN; b = branchstar {b}
+  | COLON; b = simplebranchstar {b}
+  | BLOCK; COLON; b = branchstar {b}
 
 branch:
   | PIPE; id = IDENT; DOUBLEARROW; b = block {Branch1 (id,b)}
