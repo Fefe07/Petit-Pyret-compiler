@@ -1,6 +1,12 @@
 open Format
 open Lexing
 
+
+(* TODO : formater ce fichier selon l'énoncé *)
+
+
+
+
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
 
@@ -14,9 +20,12 @@ let options =
     ( "--parse-only",
       Arg.Set parse_only,
       "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
+    ( "--type-only",
+      Arg.Set parse_only,
+      "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
   ]
 
-let usage = "usage: mini-turtle [option] file.logo"
+let usage = "usage: pyretc [option] file.logo"
 
 (* localise une erreur en indiquant la ligne et la colonne *)
 let localisation pos =
@@ -46,12 +55,12 @@ let () =
   let buf = Lexing.from_channel f in
 
   try
-    (* Parsing: la fonction  Parser.prog transforme le tampon lexical en un
+    (* Parsing: la fonction  Parser.file transforme le tampon lexical en un
        arbre de syntaxe abstraite si aucune erreur (lexicale ou syntaxique)
        n'est détectée.
-       La fonction Lexer.token est utilisée par Parser.prog pour obtenir
+       La fonction Lexer.token est utilisée par Parser.file pour obtenir
        le prochain token. *)
-    let p = Parser.prog Lexer.token buf in
+    let p = Parser.file Lexer.next_token buf in
     close_in f;
 
     (* On s'arrête ici si on ne veut faire que le parsing *)
