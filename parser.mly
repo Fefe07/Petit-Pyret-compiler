@@ -107,7 +107,6 @@ bexpr:
   | e1 = expr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
 
 bexprstar:
-  | RP {[]}
   | b = bexpr; RP {[b]}
   | b = bexpr; COMMA; bs = bexprstar {b::bs}
 
@@ -148,6 +147,7 @@ caller:
   }
 
 call_argstar:
+  | LP_CALL ; RP {[]}
   | LP_CALL; b = bexprstar {[b]}
   | LP_CALL; b = bexprstar; b2 = call_argstar {b::b2}
 

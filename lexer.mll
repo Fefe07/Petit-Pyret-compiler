@@ -12,7 +12,8 @@ Solutions :
 - Même Lexeme (un peu moins élégant mais plus efficace je pense *)
 (* Le lexer ne gère pour l'instant pas les retours à la ligne 
 (il les traite comme des blancs seulement)
-Ce qui fait que plusieurs instructions peuvent être sur la même ligne*)
+Ce qui fait que plusieurs instructions peuvent être sur la même ligne.
+Résultat : print (1) est accepté car il considère que c'est plusieurs statements *)
 
 {
   open Lexing (*Quoi ?!*)
@@ -125,7 +126,8 @@ rule next_tokens = parse
   | "block:" { blank_before := false ; [BLOCK; COLON]} (* COLON est toujours un lexeme *)
 (*  | "else:" {blank_before := false ;[ELSE; COLON]}*)
   | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
-(*  | "else" (space|'#') {[ELSE](*raise(Lexing_error "Illegal blank after the else keyword")*)(*FAUX : else if possible*)}*)
+(*  | "else" (space|'#') {[ELSE](*raise(Lexing_error "Illegal blank after the else keyword")*) } *)
+(*FAUX : else if possible. Certes mais en attendant "else :" ça doit planter*)
   | '('     { blank_before := false ; [LP] }
   | ")("    {blank_before := false ; [RP ; LP_CALL]}
   | ')'     { blank_before := false ;[RP] }
