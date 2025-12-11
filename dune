@@ -7,5 +7,4 @@
 (executable
  (name pyretc)
  (promote (until-clean))
- (flags ())
- (libraries graphics))
+ (flags ()))
