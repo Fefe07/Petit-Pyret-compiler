@@ -2,7 +2,14 @@
 (* Analyseur lexical pour Petit-Pyret *)
 
 (* TODO : fonctions polymorphes 
--> pour l'instant f < a >(...) passe à l'analyse mais ça sera pas dans les tests trust*)
+-> pour l'instant f < a >(...) passe à l'analyse mais 
+ça sera pas dans les tests trust*)
+(* Zut c'est dans les tests fun-4/5 *)
+(* Même problème pour List < Any >, testé dans testfile-type-1/2 *)
+(* Le lexing actuel ne permet pas de distinguer un chevron et un opérateur  
+Solutions : 
+- Lexer avec plus de contexte ? 
+- Même Lexeme (un peu moins élégant mais plus efficace je pense *)
 (* Le lexer ne gère pour l'instant pas les retours à la ligne 
 (il les traite comme des blancs seulement)
 Ce qui fait que plusieurs instructions peuvent être sur la même ligne*)
@@ -48,7 +55,18 @@ Ce qui fait que plusieurs instructions peuvent être sur la même ligne*)
       (*[NEWLINE; BEGIN]*)[]
     | _ ->
       NEWLINE :: unindent n *)
-  exception Boum
+
+  let pp_tok t = 
+  (match t with 
+  | BINOP Blt -> print_string "<\n"
+  | IDENT s -> print_string s 
+  | FUN  -> print_string "fun\n"
+  | LEFT_CHEV -> print_string "left_chev\n" ;
+  | _ -> print_string "pas traité\n" 
+
+  ) ; flush stdout
+
+  let blank_before = ref false
 }
 
 let letter = ['a'-'z' 'A'-'Z' '_']
@@ -60,18 +78,92 @@ let blank = space +
 
 rule next_tokens = parse
   (*| '\n'    { [NEWLINE]*)(*On est obligés de produire newline à l'analyse lexicale car le contexte requis pour savoir si la ligne est utile est trop grand*) (*new_line lexbuf*) (*; update_stack (indentation lexbuf)} *) 
+  | "#|" { comment lexbuf ; blank_before := true ; next_tokens lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *) (* Fixed : c'est un blanc avant, mais pas après*)
+  | '#' {comment_line lexbuf} 
+  | blank {blank_before := true ; next_tokens lexbuf}
+  | '+'  blank     { if not !blank_before then 
+    raise (Lexing_error "Missing blank before +") ;
+    [BINOP Badd] }
+  | '-'  blank    { if not !blank_before then 
+    raise (Lexing_error "Missing blank before -") ;
+    [BINOP Bsub] }
+  | '*'  blank    { if not !blank_before then 
+    raise (Lexing_error "Missing blank before *") ;
+    [BINOP Bmul] }
+  | "//" blank  { if not !blank_before then 
+    raise (Lexing_error "Missing blank before //") ;
+    [BINOP Bdiv] }
+
+  | "==" blank   { if not !blank_before then 
+    raise (Lexing_error "Missing blank before ==") ;
+    [BINOP Beq] }
+  | "!=" blank   { if not !blank_before then 
+    raise (Lexing_error "Missing blank before !=") ;
+    [BINOP Bneq] }
+  | "<"  blank   { 
+    if not !blank_before then 
+    (blank_before := true ; [LEFT_CHEV]) else
+    [BINOP Blt] }
+  | "<=" blank   { if not !blank_before then 
+    raise (Lexing_error "Missing blank before <=") ;
+    [BINOP Ble] }
+  | ">"  blank   { 
+    if not !blank_before then 
+    (blank_before := true  ;[RIGHT_CHEV])
+    else
+    [BINOP Bgt] }
+  | ">=" blank   {if not !blank_before then 
+    raise (Lexing_error "Missing blank before >=") ;
+    [BINOP Bge] }
+  | '=' { blank_before := false ; [EQUAL]}
+  | "=>" { blank_before := false ; [DOUBLEARROW]}
+  | '<' { blank_before := false ; [LEFT_CHEV]}
+  | ">(" { blank_before := false ;[RIGHT_CHEV; LP_CALL]}
+  | '>' {raise(Lexing_error "Illegal blank or text between '>' and the '(' of type annotations")}
+  | "->" { blank_before := false ;[ARROW]}
+  (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
+  | "block:" { blank_before := false ; [BLOCK; COLON]} (* COLON est toujours un lexeme *)
+(*  | "else:" {blank_before := false ;[ELSE; COLON]}*)
+  | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
+(*  | "else" (space|'#') {[ELSE](*raise(Lexing_error "Illegal blank after the else keyword")*)(*FAUX : else if possible*)}*)
+  | '('     { blank_before := false ; [LP] }
+  | ")("    {blank_before := false ; [RP ; LP_CALL]}
+  | ')'     { blank_before := false ;[RP] }
+  | ','     { blank_before := false ;[COMMA] }
+  | "::"    { blank_before := false ;[DBLCOLON] }
+  | ':'     { blank_before := false ;[COLON] }
+  | '|'     { blank_before := false ;[PIPE]}
+  | integer as s
+            { try blank_before := false ; [CINT (int_of_string s)]
+              with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
+  | '\''     { blank_before := false ;[CSTR (string1 lexbuf)] }
+  | '"'     { blank_before := false ;[CSTR (string2 lexbuf)] }
+  | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
+  | ident as id '(' { (*Printf.printf "%s\n" id ;*) blank_before := false ;[id_or_kwd id ; LP_CALL] }
+  | ident as id {  blank_before := false ;[id_or_kwd id] }
+  | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
+
+(* Commentaires mal gérés après les opérateurs *)
+(* and next_token_blank = parse 
+  (* | blank {next_token_blank lexbuf} *)
+
+  (*| '(' {raise (Lexing_error("Illegal blank inserted"))} *)(*Pas besoin, génerera une erreur de syntaxe*)
+    (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
+  | eof {[EOF]}
+  (*|  {next_tokens lexbuf} *)
+  (* AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH Ce truc me bouffe le premier caractère!!!!!!!!!!!!!!!!!!!*)
   | "#|" { comment lexbuf ; next_token_blank lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *) (* Fixed : c'est un blanc avant, mais pas après*)
   | '#' {comment_line lexbuf} 
   | blank {next_token_blank lexbuf}
-  | '<' {[LEFT_CHEV]}
+  | '<' { [LEFT_CHEV]}
   | ">(" {[RIGHT_CHEV; LP_CALL]}
   | '>' {raise(Lexing_error "Illegal blank between '>' and the '(' of type annotations")}
   | "->" {[ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
   | "block:" { [BLOCK; COLON]} (* COLON est toujours un lexeme *)
-  | "else:" {[ELSE; COLON]}
+  (* | "else:" {[ELSE; COLON]} *)
   | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
-  | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")}
+  (* | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")} *)
   | '('     { [LP] }
   | ")("    { [RP ; LP_CALL]}
   | ')'     { [RP] }
@@ -83,29 +175,9 @@ rule next_tokens = parse
   | '\''     { [CSTR (string1 lexbuf)] }
   | '"'     { [CSTR (string2 lexbuf)] }
   | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
-  | ident as id '(' { [id_or_kwd id ; LP_CALL] }
-  | ident as id { [id_or_kwd id] }
-  | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
-
-
-and next_token_blank = parse 
-  | blank {next_token_blank lexbuf}
-  | '+'  blank     { [BINOP Badd] }
-  | '-'  blank    { [BINOP Bsub] }
-  | '*'  blank    { [BINOP Bmul] }
-  | "//" blank  { [BINOP Bdiv] }
-  | '='  blank   { [EQUAL] }
-  | "==" blank   { [BINOP Beq] }
-  | "!=" blank   { [BINOP Bneq] }
-  | "<"  blank   { [BINOP Blt] }
-  | "<=" blank   { [BINOP Ble] }
-  | ">"  blank   { [BINOP Bgt] }
-  | ">=" blank   { [BINOP Bge] }
-  (*| '(' {raise (Lexing_error("Illegal blank inserted"))} *)(*Pas besoin, génerera une erreur de syntaxe*)
-    (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
-  | eof {[EOF]}
-  | _ {next_tokens lexbuf}
-
+  | ident as id '(' { (*Printf.printf "%s\n" id ;*) [id_or_kwd id ; LP_CALL] }
+  | ident as id {  [id_or_kwd id] }
+  | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) } *)
 
 (* and indentation = parse
   | (space(* | comment*))* '\n'
@@ -173,11 +245,11 @@ and string2 = parse
 and comment = parse
 | "|#" {}
 | "#|" {comment lexbuf ; comment lexbuf}
-| eof { raise Boum}
+| eof { raise (Lexing_error "Commentaire pas fermé")}
 | _ {comment lexbuf}
 
 and comment_line = parse 
-| '\n' {next_token_blank lexbuf}
+| '\n' {blank_before := true ; next_tokens lexbuf}
 | eof {[EOF]}
 | _ { comment_line lexbuf}
 
@@ -187,7 +259,7 @@ and comment_line = parse
   let next_token =
     let tokens = Queue.create () in (* prochains lexèmes à renvoyer *)
     fun lb ->
-      if Queue.is_empty tokens then begin
+      blank_before := false ;if Queue.is_empty tokens then begin
 	let l = next_tokens lb in
 	List.iter (fun t -> Queue.add t tokens) l
       end;
