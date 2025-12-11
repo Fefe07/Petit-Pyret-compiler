@@ -54,6 +54,7 @@
 
 %type <Ast.types> typ
 %type <Ast.types> typestar
+%type <Ast.types list> typ_params
 %%
 
 
@@ -198,9 +199,13 @@ fromstar:
 
 typ:
   | id = IDENT {Tcustom id}
+  | id = IDENT; LEFT_CHEV; t = typ_params {Tcustom_arg (id,t)}
   | LP; t1 = typestar; t2 = typ; RP {Tfun (t1, t2)}
 
 typestar:
   | t = typ; ARROW {t}
   | t = typ; COMMA; ts = typestar {Tproduct (t, ts)}
 
+typ_params:
+  | t = typ; RIGHT_CHEV {[t]}
+  | t = typ; COMMA; t2 = typ_params {t::t2}

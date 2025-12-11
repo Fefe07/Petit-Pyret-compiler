@@ -26,6 +26,7 @@ type types =
   | Tproduct of types * types
   | Tfun of types * types
   | Tcustom of string
+  | Tcustom_arg of string * types list
 
 type type_annotation = Taundef | Ta of types
 type cst = Cbool of bool | Cint of int | Cstr of string
@@ -35,7 +36,8 @@ type stmt =
   | Sexpr of expr
   | Saffect of ident * expr
   | Svar of ident * type_annotation * expr
-  | Sconst of ident * string list * type_annotation * expr (*Types génériques ajoutés*)
+  | Sconst of
+      ident * string list * type_annotation * expr (*Types génériques ajoutés*)
 
 and block = stmt list
 
