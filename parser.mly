@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token LEFT_CHEV RIGHT_CHEV NEWLINE EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP COMMA COLON DBLCOLON DEF ARROW DOUBLEARROW PIPE
+%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP COMMA COLON DBLCOLON DEF ARROW DOUBLEARROW PIPE
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -71,8 +71,8 @@ stmt_init:
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
-  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, Ta t, e)}
-  | id = IDENT; EQUAL; e = bexpr {Sconst (id, Taundef, e)}
+  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, [], Ta t, e)}
+  | id = IDENT; EQUAL; e = bexpr {Sconst (id, [], Taundef, e)}
 
 polymorph_args:
   | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
