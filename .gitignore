@@ -38,3 +38,4 @@ _opam/
 
 # Executable
 *.exe
+parser.conflicts
