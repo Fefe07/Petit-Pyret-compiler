@@ -5,6 +5,7 @@ open Lexing
 
 (* Option de compilation, pour s'arrêter à l'issue du parser *)
 let parse_only = ref false
+let type_only = ref false
 
 (* Nom du fichier source *)
 let ifile = ref ""
@@ -17,8 +18,8 @@ let options =
       Arg.Set parse_only,
       "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
     ( "--type-only",
-      Arg.Set parse_only,
-      "  Pour ne faire uniquement que la phase d'analyse syntaxique" );
+      Arg.Set type_only,
+      "  Pour ne faire uniquement que les phases d'analyse synatwique et de typage" );
   ]
 
 let usage = "usage: pyretc [option] file.arr"

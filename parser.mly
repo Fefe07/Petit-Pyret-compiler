@@ -66,12 +66,17 @@ stmt:
 
 stmt_init:
   (*Function declaration*)
-  | FUN; id = IDENT; x = funbody {Sconst (id, Taundef, Elam x)}
+  | FUN; id = IDENT; x = funbody {Sconst (id, [], Taundef, Elam x)}
+  | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody {Sconst (id, l, Taundef, Elam x)}
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
   | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, Ta t, e)}
   | id = IDENT; EQUAL; e = bexpr {Sconst (id, Taundef, e)}
+
+polymorph_args:
+  | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
+  | id = IDENT {[id]}
 
 stmt_final:
   | id = IDENT; DEF; e = bexpr {Saffect (id, e)}
