@@ -64,8 +64,8 @@ rule next_tokens = parse
   | '#' {comment_line lexbuf} 
   | blank {next_token_blank lexbuf}
   | '<' {[LEFT_CHEV]}
-  | '>' (blank | '#') {raise(Lexing_error "Illegal blank between '>' and the '(' of type annotations")}
-  | '>' {[RIGHT_CHEV]}
+  | ">(" {[RIGHT_CHEV; LP_CALL]}
+  | '>' {raise(Lexing_error "Illegal blank between '>' and the '(' of type annotations")}
   | "->" {[ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
   | "block:" { [BLOCK; COLON]} (* COLON est toujours un lexeme *)
@@ -73,6 +73,8 @@ rule next_tokens = parse
   | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
   | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")}
   | '('     { [LP] }
+  | ")("    { [RP ; LP_CALL]}
+  | ')'     { [RP] }
   | ','     { [COMMA] }
   | ':'     { [COLON] }
   | integer as s
@@ -81,11 +83,13 @@ rule next_tokens = parse
   | '\''     { [CSTR (string1 lexbuf)] }
   | '"'     { [CSTR (string2 lexbuf)] }
   | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
+  | ident as id '(' { [id_or_kwd id ; LP_CALL] }
   | ident as id { [id_or_kwd id] }
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 
 and next_token_blank = parse 
+  | blank {next_token_blank lexbuf}
   | '+'  blank     { [BINOP Badd] }
   | '-'  blank    { [BINOP Bsub] }
   | '*'  blank    { [BINOP Bmul] }
@@ -97,9 +101,9 @@ and next_token_blank = parse
   | "<=" blank   { [BINOP Ble] }
   | ">"  blank   { [BINOP Bgt] }
   | ">=" blank   { [BINOP Bge] }
-  | '(' {raise (Lexing_error("Illegal blank inserted"))} 
+  (*| '(' {raise (Lexing_error("Illegal blank inserted"))} *)(*Pas besoin, génerera une erreur de syntaxe*)
+    (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
   | eof {[EOF]}
-  (* On suppose que ( n'est jamais précédé d'un blanc, sauf si l'opérateur précédent doit être suivi d'un blanc *)
   | _ {next_tokens lexbuf}
 
 
