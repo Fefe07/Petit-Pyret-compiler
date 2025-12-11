@@ -148,8 +148,8 @@ caller:
   }
 
 call_argstar:
-  | LP_CALL; b = bexprstar {b}
-  | b = LP_CALL; b2 = bexprstar; call_argstar {b::b2}
+  | LP_CALL; b = bexprstar {[b]}
+  | LP_CALL; b = bexprstar; b2 = call_argstar {b::b2}
 
 polymorph_args:
   | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
@@ -165,12 +165,12 @@ ifblock:
 elif:
   | IF; e = bexpr; COLON; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
   | IF; e = bexpr; COLON; bif = block; ELSE; COLON; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLON; bif = block; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = block; END {Eif (e, Eblock bif, Ecall (Evar "raise", [Ecst (Cstr "undefined else case")]))}
 
 simpleelif:
   | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
   | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLON; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Evar "raise", [Ecst (Cstr "undefined else case")]))}
 
 
 branches:
@@ -204,7 +204,7 @@ forcaller:
 
 arguments:
   | LP_CALL; f = fromstar {([],f)}
-  | LP_CALL; b = bexprstar; a = arguments {let l,f = a in (b::l,a)}
+  | LP_CALL; b = bexprstar; a = arguments {let l,f = a in (b::l,f)}
 
 from:
   p = param; FROM; b = bexpr {(p, b)}
