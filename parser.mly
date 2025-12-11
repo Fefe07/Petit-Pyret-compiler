@@ -20,6 +20,7 @@
 
 %type <Ast.block> file
 %type <Ast.stmt> stmt
+%type <Ast.stmt list> list(stmt)
 %type <Ast.stmt> stmt_init
 %type <Ast.stmt> stmt_final
 
@@ -36,6 +37,7 @@
 %type <Ast.param list> funpar
 %type <Ast.param> param
 %type <Ast.caller> caller
+%type <Ast.expr list> call_arg
 
 %type <Ast.expr> ifblock
 %type <Ast.expr> elif
@@ -101,7 +103,7 @@ expr:
 
 bexpr:
   | e = expr {e}
-  | e1 = bexpr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
+  | e1 = expr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
 
 bexprstar:
   | RP {[]}
@@ -138,24 +140,29 @@ param:
   | id = IDENT; DBLCOLON; t = typ {(id, Ta t)}
 
 caller:
-  | id = IDENT {Cvar id}
-  | c = caller; LP; b = bexprstar {Cfun (c,b)}
+  | c = IDENT; b = nonempty_list(call_arg)
+  {
+    List.fold_left (fun cal bexp -> Cfun (cal,bexp)) (Cvar c) b
+  }
+
+call_arg:
+  | LP; b = bexprstar {b}
 
 
 ifblock:
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
-  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; COLON; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
   | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e, Eblock bif, belse)}
   | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = elif {Eif (e, Eblock bif, belse)}
 
 elif:
   | IF; e = bexpr; COLON; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLON; bif = block; ELSE; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = block; ELSE; COLON; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
   | IF; e = bexpr; COLON; bif = block; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
 
 simpleelif:
   | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
   | IF; e = bexpr; COLON; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Cvar "raise", [Ecst (Cstr "undefined else case")]))}
 
 
