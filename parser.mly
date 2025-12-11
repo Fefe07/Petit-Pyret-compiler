@@ -38,6 +38,7 @@
 %type <Ast.param> param
 %type <Ast.caller> caller
 %type <Ast.expr list> call_arg
+%type <Ast.ident list> polymorph_args
 
 %type <Ast.expr> ifblock
 %type <Ast.expr> elif
@@ -77,10 +78,6 @@ stmt_init:
   | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, [], Ta t, e)}
   | id = IDENT; EQUAL; e = bexpr {Sconst (id, [], Taundef, e)}
 
-polymorph_args:
-  | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
-  | id = IDENT {[id]}
-
 stmt_final:
   | id = IDENT; DEF; e = bexpr {Saffect (id, e)}
   | b = bexpr {Sexpr b}
@@ -95,8 +92,8 @@ expr:
   | BLOCK; COLON; b = block; END {Eblock b}
   | LAM; f = funbody {Elam f}
   | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
-  | c = caller; LP; b = bexprstar {Ecall (c,b)}
-  | FOR; c = caller; LP;  p = fromstar; ARROW; t = typ; b = ublock; END {
+  | c = caller; LP_CALL; b = bexprstar {Ecall (c,b)}
+  | FOR; c = caller; LP_CALL;  p = fromstar; ARROW; t = typ; b = ublock; END {
     let parameters,expressions = List.split p in 
     Ecall (c, (Elam (Funbody (parameters, t, b)))::expressions)
   }
@@ -118,7 +115,8 @@ identstar:
 
 
 block:
-  | s1 = stmt*; s2 = stmt_final {s1@[s2]}
+  | s = stmt_final {[s]}
+  | s = stmt; b = block {s::b}
 
 simpleblock:
   | s = stmt_final {[s]}
@@ -130,7 +128,7 @@ ublock:
 
 
 funbody:
-  | LP; p = funpar; ARROW; t = typ; b = ublock; END {Funbody (p,t,b)}
+  | LP_CALL; p = funpar; ARROW; t = typ; b = ublock; END {Funbody (p,t,b)}
 
 funpar:
   | RP {[]}
@@ -147,7 +145,11 @@ caller:
   }
 
 call_arg:
-  | LP; b = bexprstar {b}
+  | LP_CALL; b = bexprstar {b}
+
+polymorph_args:
+  | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
+  | id = IDENT {[id]}
 
 
 ifblock:
