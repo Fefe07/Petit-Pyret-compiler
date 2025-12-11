@@ -47,10 +47,9 @@ and expr =
   | Evar of ident
   | Eblock of block
   | Elam of funbody
-  | Ecall of caller * expr list
+  | Ecall of expr * expr list
   | Ecases of types * expr * branch list
   | Eif of expr * expr * expr
 
 and funbody = Funbody of param list * types * block
-and caller = Cfun of caller * expr list | Cvar of ident
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block

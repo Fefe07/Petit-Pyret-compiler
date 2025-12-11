@@ -36,8 +36,8 @@
 %type <Ast.funbody> funbody
 %type <Ast.param list> funpar
 %type <Ast.param> param
-%type <Ast.caller> caller
-%type <Ast.expr list> call_arg
+%type <Ast.expr> caller
+%type <Ast.expr list list> call_argstar
 %type <Ast.ident list> polymorph_args
 
 %type <Ast.expr> ifblock
@@ -50,6 +50,8 @@
 %type <Ast.branch list> branchstar
 %type <Ast.branch list> simplebranchstar
 
+%type <Ast.expr * ((Ast.param * Ast.expr) list)> forcaller
+%type <(Ast.expr list list)*((Ast.param * Ast.expr) list)> arguments
 %type <Ast.param * Ast.expr> from
 %type <(Ast.param * Ast.expr) list> fromstar
 
@@ -92,8 +94,9 @@ expr:
   | BLOCK; COLON; b = block; END {Eblock b}
   | LAM; f = funbody {Elam f}
   | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
-  | c = caller; LP_CALL; b = bexprstar {Ecall (c,b)}
-  | FOR; c = caller; LP_CALL;  p = fromstar; ARROW; t = typ; b = ublock; END {
+  | c = caller {c}
+  | FOR; x = forcaller; ARROW; t = typ; b = ublock; END {
+    let c,p = x in
     let parameters,expressions = List.split p in 
     Ecall (c, (Elam (Funbody (parameters, t, b)))::expressions)
   }
@@ -139,13 +142,14 @@ param:
   | id = IDENT; DBLCOLON; t = typ {(id, Ta t)}
 
 caller:
-  | c = IDENT; b = nonempty_list(call_arg)
+  | c = IDENT; b = call_argstar
   {
-    List.fold_left (fun cal bexp -> Cfun (cal,bexp)) (Cvar c) b
+    List.fold_left (fun cal bexp -> Ecall (cal,bexp)) (Evar c) b
   }
 
-call_arg:
+call_argstar:
   | LP_CALL; b = bexprstar {b}
+  | b = LP_CALL; b2 = bexprstar; call_argstar {b::b2}
 
 polymorph_args:
   | id = IDENT ; COMMA ; tl = polymorph_args {id :: tl}
@@ -189,6 +193,18 @@ simplebranchstar:
   | END {[]}
   | b = simplebranch; blist = simplebranchstar {b::blist}
 
+
+forcaller:
+  | id = IDENT; a = arguments {
+    let l,f = a in 
+    let call = List.fold_left (fun cal bexp -> Ecall (cal,bexp)) (Evar id) l
+    in (call,f)
+    
+  }
+
+arguments:
+  | LP_CALL; f = fromstar {([],f)}
+  | LP_CALL; b = bexprstar; a = arguments {let l,f = a in (b::l,a)}
 
 from:
   p = param; FROM; b = bexpr {(p, b)}
