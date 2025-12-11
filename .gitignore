@@ -39,3 +39,5 @@ _opam/
 # Executable
 *.exe
 parser.conflicts
+parser.automaton
+parser.ml
