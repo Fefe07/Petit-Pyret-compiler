@@ -84,16 +84,16 @@ rule next_tokens = parse
   | blank {blank_before := true ; next_tokens lexbuf}
   | '+'  blank     { if not !blank_before then 
     raise (Lexing_error "Missing blank before +") ;
-    [BINOP Badd] }
+    [PLUS] }
   | '-'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before -") ;
-    [BINOP Bsub] }
+    [MINUS] }
   | '*'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before *") ;
-    [BINOP Bmul] }
+    [MUL] }
   | "//" blank  { if not !blank_before then 
     raise (Lexing_error "Missing blank before //") ;
-    [BINOP Bdiv] }
+    [DIV] }
 
   | "==" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before ==") ;

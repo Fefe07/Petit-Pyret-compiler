@@ -41,3 +41,4 @@ _opam/
 parser.conflicts
 parser.automaton
 parser.ml
+tests-22-oct/test
