@@ -18,11 +18,11 @@ type types =
   (*
   | Talpha
   | Tany
-  | Tnothing
   | Tboolean
   | Tint 
   | Tstr
   | Tlist of types *)
+  | Tnothing
   | Tproduct of types * types
   | Tfun of types * types
   | Tcustom of string

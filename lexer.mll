@@ -81,7 +81,7 @@ Solution choisie : règler ces deux problèmes à la main
 let letter = ['a'-'z' 'A'-'Z' '_']
 let digit = ['0'-'9']
 let ident = letter ('-'* (letter | digit )+)*
-let integer = (+|-)?digit+
+let integer = ('+'|'-')? digit+
 let space = ' ' | '\t' | '\n'
 let blank = space +
 
@@ -99,15 +99,15 @@ rule next_tokens = parse
   | '*'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before *") ;
     [MUL] }
-  | "//" blank  { if not !blank_before then 
-    raise (Lexing_error "Missing blank before //") ;
+  | "/" blank  { if not !blank_before then 
+    raise (Lexing_error "Missing blank before /") ;
     [DIV] }
 
   | "==" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before ==") ;
     [BINOP Beq] }
-  | "!=" blank   { if not !blank_before then 
-    raise (Lexing_error "Missing blank before !=") ;
+  | "<>" blank   { if not !blank_before then 
+    raise (Lexing_error "Missing blank before <>") ;
     [BINOP Bneq] }
   | "<"  blank   { 
     if not !blank_before then 

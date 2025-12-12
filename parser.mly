@@ -78,6 +78,10 @@ stmt_init:
   (*Function declaration*)
   | FUN; id = IDENT; x = funbody {Sconst (id, [], Taundef, Elam x)}
   | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody {Sconst (id, l, Taundef, Elam x)}
+  (*Deguelasse mais au moins ça marche *)
+  | FUN; id = IDENT; b=BINOP ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
+  {(if b <> Blt then failwith "Erreur syntaxique : opérateur binaire autre que < après un nom de fonction" );
+  Sconst (id, l, Taundef, Elam x)}
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
@@ -245,6 +249,7 @@ typ:
   | LP; t1 = typestar; t2 = typ; RP {Tfun (t1, t2)}
 
 typestar:
+  | ARROW {Tnothing} 
   | t = typ; ARROW {t}
   | t = typ; COMMA; ts = typestar {Tproduct (t, ts)}
 
