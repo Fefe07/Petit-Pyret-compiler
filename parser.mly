@@ -7,7 +7,9 @@
 
 /* Déclaration des tokens */
 
-%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV DEF LT GT
+%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR 
+%token EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE 
+%token PLUS MINUS MUL DIV DEF LT GT
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -77,10 +79,13 @@ stmt:
 stmt_init:
   (*Function declaration*)
   | FUN; id = IDENT; x = funbody {Sconst (id, [], Taundef, Elam x)}
-  | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody {Sconst (id, l, Taundef, Elam x)}
+  | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
+  {Sconst (id, l, Taundef, Elam x)}
   (*Deguelasse mais au moins ça marche *)
   | FUN; id = IDENT; LT ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
-  {(*(if b <> Blt then failwith "Erreur syntaxique : opérateur binaire autre que < après un nom de fonction" );*)
+  {(*(if b <> Blt then 
+  failwith "Erreur syntaxique : opérateur binaire autre que < 
+    après un nom de fonction");*)
   Sconst (id, l, Taundef, Elam x)}
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, t, e)}
@@ -101,7 +106,8 @@ expr:
   | LP; b = bexpr; RP {b}
   | BLOCK; COLON; b = block; END {Eblock b}
   | LAM; f = funbody {Elam f}
-  | CASES; LP; t = typ; RP; m = bexpr; branches = branches {Ecases (t,m,branches)}
+  | CASES; LP; t = typ; RP; m = bexpr; branches = branches 
+  {Ecases (t,m,branches)}
   | c = caller {c}
   | FOR; x = forcaller; ARROW; t = typ; b = ublock; END {
     let c,p = x in
@@ -125,7 +131,8 @@ bexprstar:
   | b = bexpr; COMMA; bs = bexprstar {b::bs}
 
 identstar:
-(*  | RP {[]}*) (*Not needed : Constructor with 0 arguments are noted without () *)
+(*Not needed : Constructor with 0 arguments are noted without () *)
+(*  | RP {[]}*) 
   | id = IDENT; RP {[id]}
   | id = IDENT; COMMA; ids = identstar {id::ids}
 
@@ -187,20 +194,35 @@ polymorph_args:
 
 
 ifblock:
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END {Eif (e,Eblock bif,Eblock belse)}
-  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; COLON; belse = block; END {Eif (e,Eblock bif,Eblock belse)}
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e, Eblock bif, belse)}
-  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = elif {Eif (e, Eblock bif, belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; 
+    ELSE; COLON; belse = simpleblock; END
+  {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; COLON; belse = block; END
+  {Eif (e,Eblock bif,Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif
+  {Eif (e, Eblock bif, belse)}
+  | IF; e = bexpr; BLOCK; COLON; bif = block; ELSE; belse = elif
+  {Eif (e, Eblock bif, belse)}
 
 elif:
-  | IF; e = bexpr; COLON; bif = block; ELSE; belse = elif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLON; bif = block; ELSE; COLON; belse = block; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLON; bif = block; END {Eif (e, Eblock bif, Ecall (Evar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = block; ELSE; belse = elif
+  {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLON; bif = block; ELSE; COLON; belse = block; END
+  {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = block; END
+  {Eif (e, Eblock bif, 
+    Ecall (Evar "raise", [Ecst (Cstr "undefined else case")])
+  )}
 
 simpleelif:
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif {Eif (e,Eblock bif,belse)}
-  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END {Eif (e, Eblock bif, Eblock belse)}
-  | IF; e = bexpr; COLON; bif = simpleblock; END {Eif (e, Eblock bif, Ecall (Evar "raise", [Ecst (Cstr "undefined else case")]))}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; belse = simpleelif
+  {Eif (e,Eblock bif,belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; ELSE; COLON; belse = simpleblock; END
+  {Eif (e, Eblock bif, Eblock belse)}
+  | IF; e = bexpr; COLON; bif = simpleblock; END
+  {Eif (e, Eblock bif, 
+    Ecall (Evar "raise", [Ecst (Cstr "undefined else case")])
+  )}
 
 
 branches:
@@ -209,11 +231,13 @@ branches:
 
 branch:
   | PIPE; id = IDENT; DOUBLEARROW; b = block {Branch1 (id,b)}
-  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = block {Branch2 (id, idlist, b)}
+  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = block
+  {Branch2 (id, idlist, b)}
 
 simplebranch:
   | PIPE; id = IDENT; DOUBLEARROW; b = simpleblock {Branch1 (id,b)}
-  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = simpleblock {Branch2 (id, idlist, b)}
+  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = simpleblock
+  {Branch2 (id, idlist, b)}
 
 branchstar:
   | END {[]}
