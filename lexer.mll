@@ -79,6 +79,7 @@ Solution choisie : règler ces deux problèmes à la main
   ) ; flush stdout
 
   let blank_before = ref false
+  let num_before = ref false
 }
 
 let letter = ['a'-'z' 'A'-'Z' '_']
@@ -92,73 +93,79 @@ rule next_tokens = parse
   (*| '\n'    { [NEWLINE]*)(*On est obligés de produire newline à l'analyse lexicale car le contexte requis pour savoir si la ligne est utile est trop grand*) (*new_line lexbuf*) (*; update_stack (indentation lexbuf)} *) 
   | "#|" { comment lexbuf ; blank_before := true ; next_tokens lexbuf} (* Ici le commentaire n'est PAS un blanc. C'est MAAAAAAAAL *) (* Fixed : c'est un blanc avant, mais pas après*)
   | '#' {comment_line lexbuf} 
-  | blank {blank_before := true ; next_tokens lexbuf}
+  | (' '|'\t')* {blank_before := true ; next_tokens lexbuf}
+  | '\n' {blank_before := true ; num_before := false; next_tokens lexbuf}
   | '+'  blank     { if not !blank_before then 
     raise (Lexing_error "Missing blank before +") ;
-    [PLUS] }
+    num_before := false; [PLUS] }
   | '-'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before -") ;
-    [MINUS] }
+    num_before := false; [MINUS] }
   | '*'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before *") ;
-    [MUL] }
+    num_before := false; [MUL] }
   | "/" blank  { if not !blank_before then 
-    raise (Lexing_error "Missing blank before /") ;
-    [DIV] }
+    raise (Lexing_error "Missing blank before //") ;
+    num_before := false; [DIV] }
 
   | "==" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before ==") ;
-    [BINOP Beq] }
+    num_before := false; [BINOP Beq] }
   | "<>" blank   { if not !blank_before then 
-    raise (Lexing_error "Missing blank before <>") ;
-    [BINOP Bneq] }
+    raise (Lexing_error "Missing blank before !=") ;
+    num_before := false; [BINOP Bneq] }
   | "<"  blank   { 
     if not !blank_before then 
-    (blank_before := true ; [LEFT_CHEV]) else
-    (*[BINOP Blt]*)[LT] }
+    (blank_before := true ;num_before := false;  [LEFT_CHEV]) else
+    (num_before := false; [LT]) }
   | "<=" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before <=") ;
-    [BINOP Ble] }
+    num_before := false; [BINOP Ble] }
   | ">"  blank   { 
     if not !blank_before then 
-    (blank_before := true  ;[RIGHT_CHEV])
+    (blank_before := true  ;num_before := false; [RIGHT_CHEV])
     else
-    (*[BINOP Bgt]*)[GT] }
+    (num_before := false; [GT] )}
   | ">=" blank   {if not !blank_before then 
     raise (Lexing_error "Missing blank before >=") ;
-    [BINOP Bge] }
-  | '=' { blank_before := false ; [EQUAL]}
-  | "=>" { blank_before := false ; [DOUBLEARROW]}
-  | '<' { blank_before := false ; [LEFT_CHEV]}
-  | ">(" { blank_before := false ;[RIGHT_CHEV; LP_CALL]}
+    num_before := false; [BINOP Bge] }
+  | '=' { blank_before := false ;num_before := false;  [EQUAL]}
+  | "=>" { blank_before := false ;num_before := false;  [DOUBLEARROW]}
+  | '<' { blank_before := false ;num_before := false;  [LEFT_CHEV]}
+  | ">(" { blank_before := false ;num_before := false; [RIGHT_CHEV; LP_CALL]}
   | '>' blank '(' {raise(Lexing_error "Illegal blank or text between '>' and the '(' of type annotations")}
-  | '>' { blank_before := false ; [RIGHT_CHEV]}
-  | "->" { blank_before := false ;[ARROW]}
+  | '>' { blank_before := false ;num_before := false;  [RIGHT_CHEV]}
+  | "->" { blank_before := false ;num_before := false; [ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
-  | "block:" { blank_before := false ; [BLOCK; COLON]} (* COLON est toujours un lexeme *)
-  | "else:" {blank_before := false ;[ELSE; COLON]}
-  | "else if" {blank_before := false ;[ELSE; IF]}
+  | "block:" { blank_before := false ;num_before := false;  [BLOCK; COLON]} (* COLON est toujours un lexeme *)
+  | "else:" {blank_before := false ;num_before := false; [ELSE; COLON]}
+  | "else if" {blank_before := false ;num_before := false; [ELSE; IF]}
   | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
   | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")}
-  | "cases" (space|'\t')* '(' {[CASES;LP]}
-  | "cases"  {[CASES]}
-  | '('     { blank_before := false ; [LP] }
-  | ")("    {blank_before := false ; [RP ; LP_CALL]}
-  | ')'     { blank_before := false ;[RP] }
-  | ','     { blank_before := false ;[COMMA] }
-  | "::"    { blank_before := false ;[DBLCOLON] }
-  | ":="     { blank_before := false ;[DEF] }
-  | ':'     { blank_before := false ;[COLON]}
-  | '|'     { blank_before := false ;[PIPE]}
+  | "cases" (space|'\t')* '(' {num_before := false; [CASES;LP]}
+  | "cases"  {num_before := false; [CASES]}
+  | '('     { blank_before := false ;num_before := false;  [LP] }
+  | ")("    {blank_before := false ;num_before := false;  [RP ; LP_CALL]}
+  | ')'     { blank_before := false ;num_before := false; [RP] }
+  | ','     { blank_before := false ;num_before := false; [COMMA] }
+  | "::"    { blank_before := false ;num_before := false; [DBLCOLON] }
+  | ":="     { blank_before := false ;num_before := false; [DEF] }
+  | ':'     { blank_before := false ;num_before := false; [COLON]}
+  | '|'     { blank_before := false ;num_before := false; [PIPE]}
   | integer as s
-            { try blank_before := false ; [CINT (int_of_string s)]
+            { if !num_before then raise (Lexing_error "need operator between integers") else
+            try blank_before := false ;num_before := true;  [CINT (int_of_string s)]
               with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
-  | '\''     { blank_before := false ;[CSTR (string1 lexbuf)] }
-  | '"'     { blank_before := false ;[CSTR (string2 lexbuf)] }
+  | '\''     { blank_before := false ;num_before := false; [CSTR (string1 lexbuf)] }
+  | '"'     { blank_before := false ;num_before := false; [CSTR (string2 lexbuf)] }
   | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
   | ident as id '(' { (*Printf.printf "%s\n" id ;*) blank_before := false ;[id_or_kwd id ; LP_CALL] }
-  | ident as id {  blank_before := false ;[id_or_kwd id] }
-  | ident as id (space|'\t')+ '(' {raise (Lexing_error "Illegal blank between caller and arguments")}
+  | ident as id {  blank_before := false ;
+    let p = id_or_kwd id in 
+    match p with 
+    | IDENT s -> num_before:=true; [p]
+    | _ -> num_before := false; [p]}
+  | ident (space|'\t')+ '(' {raise (Lexing_error "Illegal blank between caller and arguments")}
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 (* Commentaires mal gérés après les opérateurs *)
