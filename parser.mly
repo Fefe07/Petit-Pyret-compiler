@@ -203,11 +203,11 @@ branches:
 
 branch:
   | PIPE; id = IDENT; DOUBLEARROW; b = block {Branch1 (id,b)}
-  | PIPE; id = IDENT; LP; idlist = identstar; DOUBLEARROW; b = block {Branch2 (id, idlist, b)}
+  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = block {Branch2 (id, idlist, b)}
 
 simplebranch:
   | PIPE; id = IDENT; DOUBLEARROW; b = simpleblock {Branch1 (id,b)}
-  | PIPE; id = IDENT; LP; idlist = identstar; DOUBLEARROW; b = simpleblock {Branch2 (id, idlist, b)}
+  | PIPE; id = IDENT; LP_CALL; idlist = identstar; DOUBLEARROW; b = simpleblock {Branch2 (id, idlist, b)}
 
 branchstar:
   | END {[]}
