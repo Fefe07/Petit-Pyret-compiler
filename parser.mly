@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV
+%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV DEF
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -85,7 +85,7 @@ stmt_init:
   | id = IDENT; EQUAL; e = bexpr {Sconst (id, [], Taundef, e)}
 
 stmt_final:
-  | id = IDENT; COLON; EQUAL; e = bexpr {Saffect (id, e)}
+  | id = IDENT; DEF; e = bexpr {Saffect (id, e)}
   | b = bexpr {Sexpr b}
 
 
