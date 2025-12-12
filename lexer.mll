@@ -170,7 +170,7 @@ rule next_tokens = parse
       [CSTR (string2 lexbuf)]
     }
   | eof { [EOF] } 
-  | ident as id; '(' {
+  | ident as id '(' {
       blank_before := false;
       [id_or_kwd id; LP_CALL]
     }
