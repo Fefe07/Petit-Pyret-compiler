@@ -59,9 +59,9 @@
 %type <Ast.param * Ast.expr> from
 %type <(Ast.param * Ast.expr) list> fromstar
 
-%type <Ast.types> typ
-%type <Ast.types> typestar
-%type <Ast.types list> typ_params
+%type <Ast.type_annotation> typ
+%type <Ast.type_annotation list> typestar
+%type <Ast.type_annotation list> typ_params
 %%
 
 
@@ -83,9 +83,9 @@ stmt_init:
   {(*(if b <> Blt then failwith "Erreur syntaxique : opérateur binaire autre que < après un nom de fonction" );*)
   Sconst (id, l, Taundef, Elam x)}
   (*Variable declaration*)
-  | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
+  | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
-  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, [], Ta t, e)}
+  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, [],t, e)}
   | id = IDENT; EQUAL; e = bexpr {Sconst (id, [], Taundef, e)}
 
 stmt_final:
@@ -168,7 +168,7 @@ funpar:
   | p = param; RP {[p]}
 
 param:
-  | id = IDENT; DBLCOLON; t = typ {(id, Ta t)}
+  | id = IDENT; DBLCOLON; t = typ {(id, t)}
 
 caller:
   | c = IDENT; b = call_argstar
@@ -246,16 +246,16 @@ fromstar:
 
 
 typ:
-  | id = IDENT {Tcustom id}
-  | id = IDENT; LEFT_CHEV; t = typ_params {Tcustom_arg (id,t)}
+  | id = IDENT {Ta id}
+  | id = IDENT; LEFT_CHEV; t = typ_params {Talist (id,t)}
   (* Déguelasse mais fonctionnel. Lever d'erreur à améliorer *)
-  | id = IDENT; LT; t = typ_params {(*assert(b==Blt);*)  Tcustom_arg (id,t)}
-  | LP; t1 = typestar; t2 = typ; RP {Tfun (t1, t2)}
+  | id = IDENT; LT; t = typ_params {(*assert(b==Blt);*)  Talist (id,t)}
+  | LP; t1 = typestar; t2 = typ RP {Tafun (t1, t2)}
 
 typestar:
-  | ARROW {Tnothing} 
-  | t = typ; ARROW {t}
-  | t = typ; COMMA; ts = typestar {Tproduct (t, ts)}
+  | ARROW {[]} 
+  | t = typ; ARROW {[t]}
+  | t = typ; COMMA; ts = typestar {t::ts}
 
 typ_params:
   | t = typ; RIGHT_CHEV {[t]}

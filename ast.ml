@@ -15,20 +15,22 @@ type binop =
 type ident = string
 
 type types =
-  (*
   | Talpha
   | Tany
   | Tboolean
-  | Tint 
+  | Tint
   | Tstr
-  | Tlist of types *)
+  | Tlist of types
   | Tnothing
   | Tproduct of types * types
   | Tfun of types * types
-  | Tcustom of string
-  | Tcustom_arg of string * types list
 
-type type_annotation = Taundef | Ta of types
+type type_annotation =
+  | Taundef
+  | Ta of string
+  | Talist of string * type_annotation list
+  | Tafun of type_annotation list * type_annotation
+
 type cst = Cbool of bool | Cint of int | Cstr of string
 type param = ident * type_annotation
 
@@ -48,8 +50,8 @@ and expr =
   | Eblock of block
   | Elam of funbody
   | Ecall of expr * expr list
-  | Ecases of types * expr * branch list
+  | Ecases of type_annotation * expr * branch list
   | Eif of expr * expr * expr
 
-and funbody = Funbody of param list * types * block
+and funbody = Funbody of param list * type_annotation * block
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
