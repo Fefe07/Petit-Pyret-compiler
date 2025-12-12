@@ -111,7 +111,7 @@ bexprstar:
   | b = bexpr; COMMA; bs = bexprstar {b::bs}
 
 identstar:
-  | RP {[]}
+(*  | RP {[]}*) (*Not needed : Constructor with 0 arguments are noted without () *)
   | id = IDENT; RP {[id]}
   | id = IDENT; COMMA; ids = identstar {id::ids}
 

@@ -10,10 +10,15 @@
 Solutions : 
 - Lexer avec plus de contexte ? 
 - Même Lexeme (un peu moins élégant mais plus efficace je pense *)
+
 (* Le lexer ne gère pour l'instant pas les retours à la ligne 
 (il les traite comme des blancs seulement)
 Ce qui fait que plusieurs instructions peuvent être sur la même ligne.
-Résultat : print (1) est accepté car il considère que c'est plusieurs statements *)
+Résultat : 
+- print (1) est accepté car il considère que c'est plusieurs statements 
+- 1+2 et 1-2 aussi 
+Solution choisie : règler ces deux problèmes à la main 
+(conseil de Samuel) *)
 
 {
   open Lexing (*Quoi ?!*)
@@ -62,7 +67,11 @@ Résultat : print (1) est accepté car il considère que c'est plusieurs stateme
   | BINOP Blt -> print_string "<\n"
   | IDENT s -> print_string s 
   | FUN  -> print_string "fun\n"
-  | LEFT_CHEV -> print_string "left_chev\n" ;
+  | LEFT_CHEV -> print_string "left_chev\n" 
+  | CINT n -> print_int n 
+  | BINOP Badd -> print_string "+\n"
+  | EOF -> print_string "eof\n"
+
   | _ -> print_string "pas traité\n" 
 
   ) ; flush stdout
@@ -120,7 +129,8 @@ rule next_tokens = parse
   | "=>" { blank_before := false ; [DOUBLEARROW]}
   | '<' { blank_before := false ; [LEFT_CHEV]}
   | ">(" { blank_before := false ;[RIGHT_CHEV; LP_CALL]}
-  | '>' {raise(Lexing_error "Illegal blank or text between '>' and the '(' of type annotations")}
+  | '>' blank '(' {raise(Lexing_error "Illegal blank or text between '>' and the '(' of type annotations")}
+  | '>' { blank_before := false ; [RIGHT_CHEV]}
   | "->" { blank_before := false ;[ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
   | "block:" { blank_before := false ; [BLOCK; COLON]} (* COLON est toujours un lexeme *)
