@@ -81,7 +81,7 @@ Solution choisie : règler ces deux problèmes à la main
 let letter = ['a'-'z' 'A'-'Z' '_']
 let digit = ['0'-'9']
 let ident = letter ('-'* (letter | digit )+)*
-let integer = ('-'|'+')? digit+
+let integer = digit+
 let space = ' ' | '\t' | '\n'
 let blank = space +
 
@@ -253,6 +253,7 @@ and string2 = parse
 
   | eof
       { raise (Lexing_error "unterminated string") }
+  | '\\' {raise (Lexing_error "undefined escape sequence")}
   | _ as c
       { Buffer.add_char string_buffer c;
 	string2 lexbuf }
