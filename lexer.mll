@@ -61,10 +61,13 @@ Solution choisie : règler ces deux problèmes à la main
     | _ ->
       NEWLINE :: unindent n *)
 
+  (* Ugly printer *)
   let pp_tok t = 
   (match t with 
   | BINOP Blt -> print_string "<\n"
-  | IDENT s -> print_string s 
+  | BINOP Bgt -> print_string ">\n"
+  | EQUAL -> print_string "=\n"
+  | IDENT s -> print_string (s^"\n") 
   | FUN  -> print_string "fun\n"
   | LEFT_CHEV -> print_string "left_chev\n" 
   | CINT n -> print_int n 
@@ -112,7 +115,7 @@ rule next_tokens = parse
   | "<"  blank   { 
     if not !blank_before then 
     (blank_before := true ; [LEFT_CHEV]) else
-    [BINOP Blt] }
+    (*[BINOP Blt]*)[LT] }
   | "<=" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before <=") ;
     [BINOP Ble] }
@@ -120,7 +123,7 @@ rule next_tokens = parse
     if not !blank_before then 
     (blank_before := true  ;[RIGHT_CHEV])
     else
-    [BINOP Bgt] }
+    (*[BINOP Bgt]*)[GT] }
   | ">=" blank   {if not !blank_before then 
     raise (Lexing_error "Missing blank before >=") ;
     [BINOP Bge] }

@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV DEF
+%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV DEF LT GT
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -79,8 +79,8 @@ stmt_init:
   | FUN; id = IDENT; x = funbody {Sconst (id, [], Taundef, Elam x)}
   | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody {Sconst (id, l, Taundef, Elam x)}
   (*Deguelasse mais au moins ça marche *)
-  | FUN; id = IDENT; b=BINOP ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
-  {(if b <> Blt then failwith "Erreur syntaxique : opérateur binaire autre que < après un nom de fonction" );
+  | FUN; id = IDENT; LT ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
+  {(*(if b <> Blt then failwith "Erreur syntaxique : opérateur binaire autre que < après un nom de fonction" );*)
   Sconst (id, l, Taundef, Elam x)}
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, Ta t, e)}
@@ -113,6 +113,8 @@ expr:
 bexpr:
   | e = expr {e}
   | e1 = expr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
+  | e1 = expr; b = LT; e2 = plusexpr {Bexpr (Blt, e1, e2)}
+  | e1 = expr; b = GT; e2 = plusexpr {Bexpr (Bgt, e1, e2)}
   | e1 = expr; b = PLUS; e2 = plusexpr {Bexpr (Badd, e1, e2)}
   | e1 = expr; b = MINUS; e2 = minexpr {Bexpr (Bsub, e1, e2)}
   | e1 = expr; b = MUL; e2 = mulexpr {Bexpr (Bmul, e1, e2)}
@@ -246,6 +248,8 @@ fromstar:
 typ:
   | id = IDENT {Tcustom id}
   | id = IDENT; LEFT_CHEV; t = typ_params {Tcustom_arg (id,t)}
+  (* Déguelasse mais fonctionnel. Lever d'erreur à améliorer *)
+  | id = IDENT; LT; t = typ_params {(*assert(b==Blt);*)  Tcustom_arg (id,t)}
   | LP; t1 = typestar; t2 = typ; RP {Tfun (t1, t2)}
 
 typestar:
@@ -255,4 +259,6 @@ typestar:
 
 typ_params:
   | t = typ; RIGHT_CHEV {[t]}
+  (* Toujours aussi moche *)
+  | t = typ; GT {(*assert(b==Bgt) ;*) [t]}
   | t = typ; COMMA; t2 = typ_params {t::t2}
