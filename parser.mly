@@ -7,7 +7,7 @@
 
 /* Déclaration des tokens */
 
-%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON DEF ARROW DOUBLEARROW PIPE
+%token LEFT_CHEV RIGHT_CHEV EOF BLOCK CASES ELSE END FOR FROM FUN IF LAM VAR EQUAL LP RP LP_CALL COMMA COLON DBLCOLON ARROW DOUBLEARROW PIPE PLUS MINUS MUL DIV DEF
 %token <Ast.binop> BINOP
 %token <int> CINT
 %token <string> CSTR IDENT
@@ -28,6 +28,10 @@
 %type <Ast.expr> bexpr
 %type <Ast.expr list> bexprstar
 %type <Ast.ident list> identstar
+%type <Ast.expr> plusexpr
+%type <Ast.expr> minexpr
+%type <Ast.expr> divexpr
+%type <Ast.expr> mulexpr
 
 %type <Ast.block> block
 %type <Ast.block> simpleblock
@@ -105,6 +109,10 @@ expr:
 bexpr:
   | e = expr {e}
   | e1 = expr; b = BINOP; e2 = bexpr {Bexpr (b, e1, e2)}
+  | e1 = expr; b = PLUS; e2 = plusexpr {Bexpr (Badd, e1, e2)}
+  | e1 = expr; b = MINUS; e2 = minexpr {Bexpr (Bsub, e1, e2)}
+  | e1 = expr; b = MUL; e2 = mulexpr {Bexpr (Bmul, e1, e2)}
+  | e1 = expr; b = DIV; e2 = divexpr {Bexpr (Bdiv, e1, e2)}
 
 bexprstar:
   | b = bexpr; RP {[b]}
@@ -114,6 +122,22 @@ identstar:
 (*  | RP {[]}*) (*Not needed : Constructor with 0 arguments are noted without () *)
   | id = IDENT; RP {[id]}
   | id = IDENT; COMMA; ids = identstar {id::ids}
+
+plusexpr:
+  | e = expr {e}
+  | e1 = expr; b = PLUS; e2 = plusexpr {Bexpr (Badd, e1, e2)}
+
+minexpr:
+  | e = expr {e}
+  | e1 = expr; b = MINUS; e2 = minexpr {Bexpr (Bsub, e1, e2)}
+
+mulexpr:
+  | e = expr {e}
+  | e1 = expr; b = MUL; e2 = mulexpr {Bexpr (Bmul, e1, e2)}
+
+divexpr:
+  | e = expr {e}
+  | e1 = expr; b = DIV; e2 = divexpr {Bexpr (Bdiv, e1, e2)}
 
 
 block:

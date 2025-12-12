@@ -30,13 +30,12 @@ Solution choisie : règler ces deux problèmes à la main
   let id_or_kwd =
     let h = Hashtbl.create 42 in
     List.iter (fun (s, tok) -> Hashtbl.add h s tok)
-      ["lam",LAM ; "if", IF; "else", ELSE;
+      ["lam",LAM ; "if", IF;
        "for", FOR;
        "and", BINOP Band; "or", BINOP Bor;
        "true",CBOOL true;
        "false", CBOOL false;
        "block", BLOCK;
-       "cases", CASES;
        "end", END;
        "from", FROM ;
        "fun", FUN ;
@@ -93,16 +92,16 @@ rule next_tokens = parse
   | blank {blank_before := true ; next_tokens lexbuf}
   | '+'  blank     { if not !blank_before then 
     raise (Lexing_error "Missing blank before +") ;
-    [BINOP Badd] }
+    [PLUS] }
   | '-'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before -") ;
-    [BINOP Bsub] }
+    [MINUS] }
   | '*'  blank    { if not !blank_before then 
     raise (Lexing_error "Missing blank before *") ;
-    [BINOP Bmul] }
+    [MUL] }
   | "//" blank  { if not !blank_before then 
     raise (Lexing_error "Missing blank before //") ;
-    [BINOP Bdiv] }
+    [DIV] }
 
   | "==" blank   { if not !blank_before then 
     raise (Lexing_error "Missing blank before ==") ;
@@ -134,16 +133,19 @@ rule next_tokens = parse
   | "->" { blank_before := false ;[ARROW]}
   (* | ("block"|"else") blank ':'  {raise (Lexing_error("Illegal blank inserted"))} *)
   | "block:" { blank_before := false ; [BLOCK; COLON]} (* COLON est toujours un lexeme *)
-(*  | "else:" {blank_before := false ;[ELSE; COLON]}*)
+  | "else:" {blank_before := false ;[ELSE; COLON]}
+  | "else if" {blank_before := false ;[ELSE; IF]}
   | "block" (space|'#') {raise(Lexing_error "Illegal blank after the block keyword")}
-(*  | "else" (space|'#') {[ELSE](*raise(Lexing_error "Illegal blank after the else keyword")*) } *)
-(*FAUX : else if possible. Certes mais en attendant "else :" ça doit planter*)
+  | "else" (space|'#') {raise(Lexing_error "Illegal blank after the else keyword")}
+  | "cases" (space|'\t')* '(' {[CASES;LP]}
+  | "cases"  {[CASES]}
   | '('     { blank_before := false ; [LP] }
   | ")("    {blank_before := false ; [RP ; LP_CALL]}
   | ')'     { blank_before := false ;[RP] }
   | ','     { blank_before := false ;[COMMA] }
   | "::"    { blank_before := false ;[DBLCOLON] }
-  | ':'     { blank_before := false ;[COLON] }
+  | ":="     { blank_before := false ;[DEF] }
+  | ':'     { blank_before := false ;[COLON]}
   | '|'     { blank_before := false ;[PIPE]}
   | integer as s
             { try blank_before := false ; [CINT (int_of_string s)]
@@ -153,6 +155,7 @@ rule next_tokens = parse
   | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
   | ident as id '(' { (*Printf.printf "%s\n" id ;*) blank_before := false ;[id_or_kwd id ; LP_CALL] }
   | ident as id {  blank_before := false ;[id_or_kwd id] }
+  | ident as id (space|'\t')+ '(' {raise (Lexing_error "Illegal blank between caller and arguments")}
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
 (* Commentaires mal gérés après les opérateurs *)
