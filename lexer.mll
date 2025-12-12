@@ -150,14 +150,18 @@ rule next_tokens = parse
   | ':'     { blank_before := false ;num_before := false; [COLON]}
   | '|'     { blank_before := false ;num_before := false; [PIPE]}
   | integer as s
-            { (*if !num_before then raise (Lexing_error "need operator between integers") else*)
+            { if !num_before then raise (Lexing_error "need operator between integers") else
             try blank_before := false ;num_before := true;  [CINT (int_of_string s)]
               with _ -> raise (Lexing_error ("constant too large: " ^ s)) }
   | '\''     { blank_before := false ;num_before := false; [CSTR (string1 lexbuf)] }
   | '"'     { blank_before := false ;num_before := false; [CSTR (string2 lexbuf)] }
   | eof     { (*NEWLINE :: unindent 0 @*) [EOF] } 
   | ident as id '(' { (*Printf.printf "%s\n" id ;*) blank_before := false ;[id_or_kwd id ; LP_CALL] }
-  | ident as id {  blank_before := false ;num_before := true; [id_or_kwd id] }
+  | ident as id {  blank_before := false ;
+    let p = id_or_kwd id in 
+    match p with 
+    | IDENT s -> num_before:=true; [p]
+    | _ -> num_before := false; [p]}
   | ident (space|'\t')+ '(' {raise (Lexing_error "Illegal blank between caller and arguments")}
   | _ as c  { raise (Lexing_error ("illegal character: " ^ String.make 1 c)) }
 
