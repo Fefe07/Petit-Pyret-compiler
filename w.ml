@@ -18,6 +18,7 @@ module V = struct
 end
 
 let rec head (t:types): types =
+  (* "Déplie" récursivement une variable de type contenant un type*)
   match t with
   | Tvar tv -> begin
     match tv.def with 
@@ -36,6 +37,7 @@ let rec canon t =
   | Tlist x -> Tlist (canon x)
 
 let rec occur (tv : tvar)(t : types) : bool = 
+  (* Regarde si la variable tv apparait dans le type t *)
   match head t with 
   | Tvar tv' when tv.id = tv'.id -> true 
   | Tvar tv' -> begin match tv'.def with
@@ -50,6 +52,8 @@ let unification_error t1 t2 =
   raise (UnificationFailure (canon t1, canon t2))
 
 let rec unify (t : types) (t':types): unit = 
+  (* Modifie les variables de type de t et t' afin qu'ils soient égaux *)
+  (* Renvoie Unification_Error si les types sont incompatibles *)
   match head t, head t' with 
   | Tfun (x1,y1), Tfun (x2,y2) -> begin
       try
@@ -88,7 +92,9 @@ let rec fvars (t : types) : Vset.t =
 
 module Smap = Map.Make(String)
 module Sset = Set.Make(String)
+
 type schema = { vars : Sset.t; typ : types }
+
 
 type env = {
   bindings : schema Smap.t;
@@ -97,6 +103,7 @@ type env = {
   fvars : Vset.t }
 
 let rec bien_forme environment typ = 
+  (* Vérifie que toutes les types polymorphes sont bien définis ? *)
   match head typ with
   | Tint | Tstr | Tboolean | Tany | Tnothing -> true
   | Tfun (x,y) -> List.for_all (bien_forme environment) x

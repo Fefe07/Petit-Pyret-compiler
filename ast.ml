@@ -15,8 +15,8 @@ type binop =
 type ident = string
 
 type types =
-  | Tvar of tvar
-  | Talpha of ident
+  | Tvar of tvar    (* Une variable de type *)
+  | Talpha of ident (* Un type polymorphe et son nom *)
   | Tany
   | Tboolean
   | Tint
