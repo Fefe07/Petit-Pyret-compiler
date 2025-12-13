@@ -267,7 +267,8 @@ and w_stmt environment stmt =
   | Sconst (id, poly, ta, e) ->
     let new_env = add_poly environment poly in
     let ret_type = read_ta new_env ta in 
-    (unify ret_type (w_expr e new_env);
+    let t = (w_expr e new_env) in (
+    unify ret_type t;
     add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
     Tnothing)
 
@@ -341,7 +342,10 @@ and w_expr exp environment =
       let new_env = List.fold_left
       (fun e (id,t_a) -> add_bind e id (read_ta environment t_a))
       environment params in
+      let start_types = List.fold_right (
+        fun (id, t_a) l -> (read_ta environment t_a)::l
+      ) params [] in
       let r_type = w new_env b in 
-      (unify r_type (read_ta new_env ta); r_type)
+      (unify r_type (read_ta new_env ta); Tfun(start_types, r_type))
 
 let typing s = w start_environment s
