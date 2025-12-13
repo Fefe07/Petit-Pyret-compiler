@@ -1,5 +1,6 @@
 open Format
 open Lexing
+open W
 
 (* TODO : formater ce fichier selon l'énoncé *)
 
@@ -61,7 +62,9 @@ let () =
     close_in f;
 
     (* On s'arrête ici si on ne veut faire que le parsing *)
-    if !parse_only then exit 0
+    if !parse_only then exit 0;
+    W.typing p;
+    if !type_only then exit 0
   with
   | Lexer.Lexing_error c ->
       (* Erreur lexicale. On récupère sa position absolue et
@@ -75,6 +78,13 @@ let () =
       localisation (Lexing.lexeme_start_p buf);
       eprintf "Erreur syntaxique @.";
       exit 1
+  | UnificationFailure _ -> eprintf "Erreur d'unification @."; exit 1
+  | RedifinedVariable id -> eprintf "Variable redéfinie %s@." id;
+      exit 1
+  | NotCallable _ -> eprintf "Type not callable @."; exit 1
+  | UnknownAnnotation _ -> eprintf "Annotaion inconnue @."; exit 1
+  | WrongCase -> eprintf "Case inconnu @."; exit 1
+
 (*
     | Interp.Error s->
 	(* Erreur pendant l'interprétation *)

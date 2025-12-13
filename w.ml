@@ -328,3 +328,4 @@ and w_expr exp environment =
       let r_type = w new_env b in 
       (unify r_type (read_ta new_env ta); r_type)
 
+let typing s = w start_environment s
