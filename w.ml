@@ -149,7 +149,7 @@ let add_bind environment name typ =
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
   then raise (RedefinedVariable name)
-  else 
+  else
     let scheme = {vars = Sset.empty; typ = typ} in
     let fvars = Vset.union environment.fvars (fvars typ) in
     {
@@ -323,13 +323,14 @@ and w_expr exp environment =
         end
       | _ -> raise (NotCallable f_type) end
   | Ecases (ta, e, branches) ->
-      let t = w_expr e environment in begin
-      unify t (Tlist (Tvar (V.create ())));
+      let t = w_expr e environment in 
+      let sub_type = Tvar (V.create ()) in begin
+      unify t (Tlist sub_type);
       unify t (read_ta environment ta);
       match branches with
       | (Branch1 ("empty", be))::(Branch2 ("link", [x;y], bl))::[]
       | (Branch2 ("link", [x;y], bl))::(Branch1 ("empty", be))::[] ->
-          let new_env = add_bind (add_bind environment x t) y (Tlist t) in
+          let new_env = add_bind (add_bind environment x sub_type) y t in
           let t_ret = w new_env bl in
           begin unify t_ret (w environment be);
           t_ret end
