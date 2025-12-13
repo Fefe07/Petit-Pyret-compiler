@@ -1,10 +1,12 @@
 open Ast 
-open Parser
+open Format
 exception UnificationFailure of types * types
-exception RedifinedVariable of string
+exception RedefinedVariable of string
 exception NotCallable of types
 exception UnknownAnnotation of type_annotation
 exception WrongCase
+exception WrongArgsNumber of int * int
+exception VariableNotFound of string
 
 module V = struct 
   type t = tvar
@@ -21,8 +23,8 @@ let rec head (t:types): types =
     match tv.def with 
     | None -> t 
     | Some t' -> head t'
-  end 
-  | _ -> t 
+  end
+  | _ -> t
 
 let rec canon t = 
   let t' = head t in 
@@ -49,7 +51,12 @@ let unification_error t1 t2 =
 
 let rec unify (t : types) (t':types): unit = 
   match head t, head t' with 
-  | Tfun (x1,y1), Tfun (x2,y2) -> List.iter2 unify x1 x2; unify y1 y2
+  | Tfun (x1,y1), Tfun (x2,y2) -> begin
+      try
+        List.iter2 unify x1 x2;
+        unify y1 y2
+      with | Invalid_argument _ -> raise (UnificationFailure (t,t'))
+    end
   | Tproduct(x1,y1),Tproduct(x2,y2) -> unify x1 x2 ; unify y1 y2
 
   | Tint, Tint | Tstr, Tstr | Tany, Tany | Tnothing, Tnothing 
@@ -141,7 +148,7 @@ let start_environment = {
 let add_bind environment name typ =
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
-  then raise (RedifinedVariable name)
+  then raise (RedefinedVariable name)
   else 
     let scheme = {vars = Sset.empty; typ = typ} in
     let fvars = Vset.union environment.fvars (fvars typ) in
@@ -155,7 +162,7 @@ let add_bind environment name typ =
 let add_var environment name typ = 
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
-  then raise (RedifinedVariable name)
+  then raise (RedefinedVariable name)
   else
     let fvars = Vset.union environment.fvars (fvars typ) in
     {
@@ -167,10 +174,10 @@ let add_var environment name typ =
 
 let add_poly environment poly = 
   let def_types = Sset.of_list
-      ["Number"; "Any"; "Boolean"; "Nothing"; "String"] in
+      ["Number"; "Any"; "Boolean"; "Nothing"; "String";"List"] in
   let add_one env p =
     if Sset.mem p env.types || Sset.mem p def_types 
-    then raise (RedifinedVariable p)
+    then raise (RedefinedVariable p)
     else
       {
         bindings = environment.bindings;
@@ -183,7 +190,7 @@ let add_poly environment poly =
 let add_schema environment name s =
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
-  then raise (RedifinedVariable name)
+  then raise (RedefinedVariable name)
   else
     {
       bindings = Smap.add name s environment.bindings;
@@ -219,7 +226,7 @@ let rec read_ta environment ta =
 
 let find e id = 
   if Smap.mem id e.var_bindings then Smap.find id e.var_bindings
-  else 
+  else try
     let s = Smap.find id e.bindings in
     let rec fresh_type quant maps t = 
       match head t with
@@ -227,7 +234,7 @@ let find e id =
       | Tlist x -> Tlist (fresh_type quant maps x)
       | Tfun (t_list, tret) ->
           Tfun (List.map (fresh_type quant maps) t_list,
-            fresh_type quant maps t)
+            fresh_type quant maps tret)
       | Tproduct (t1, t2) -> Tproduct (fresh_type quant maps t1,
           fresh_type quant maps t1)
       | Talpha a -> if Hashtbl.mem maps a then Hashtbl.find maps a
@@ -237,6 +244,7 @@ let find e id =
           else Talpha a
       | Tvar t -> Tvar t in
     fresh_type s.vars (Hashtbl.create 16) s.typ
+  with | Not_found -> raise (VariableNotFound id)
 
 let rec w environment stmts =
   let (_, ret_type) = List.fold_left
@@ -246,11 +254,12 @@ let rec w environment stmts =
 and w_stmt environment stmt = 
   match stmt with 
   | Sexpr e -> (environment, w_expr e environment)
-  | Saffect (id,e) -> begin
-    unify (Smap.find id environment.var_bindings)
-          (w_expr e environment);
-    (environment, Smap.find id environment.var_bindings)
-  end
+  | Saffect (id,e) -> (
+    try
+      unify (Smap.find id environment.var_bindings)
+            (w_expr e environment);
+      (environment, Smap.find id environment.var_bindings)
+    with | Not_found -> raise (VariableNotFound id))
   | Svar (id, ta, e) ->
     let r_type = read_ta environment ta in begin
       unify r_type (w_expr e environment);
@@ -302,10 +311,16 @@ and w_expr exp environment =
   | Ecall (func, args) ->
       let f_type = w_expr func environment in begin
       match f_type with
-      | Tfun (targs, tret) -> (
+      | Tfun (targs, tret) -> begin
+        try
+        (
           List.iter2 (fun x y -> unify x (w_expr y environment))
               targs args;
-          tret)
+          tret
+        )
+        with |Invalid_argument _ -> raise
+          (WrongArgsNumber ((List.length targs),(List.length args)))
+        end
       | _ -> raise (NotCallable f_type) end
   | Ecases (ta, e, branches) ->
       let t = w_expr e environment in begin

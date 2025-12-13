@@ -79,11 +79,17 @@ let () =
       eprintf "Erreur syntaxique @.";
       exit 1
   | UnificationFailure _ -> eprintf "Erreur d'unification @."; exit 1
-  | RedifinedVariable id -> eprintf "Variable redéfinie %s@." id;
+  | RedefinedVariable id -> eprintf "Variable redéfinie %s@." id;
       exit 1
   | NotCallable _ -> eprintf "Type not callable @."; exit 1
   | UnknownAnnotation _ -> eprintf "Annotaion inconnue @."; exit 1
   | WrongCase -> eprintf "Case inconnu @."; exit 1
+  | WrongArgsNumber (x,y) ->
+      eprintf "%d argument(s) attendu(s), mais %d reçu(s) @."
+        x y;
+      exit 1
+  | VariableNotFound x -> eprintf "Variable non définie %s@." x;
+      exit 1
 
 (*
     | Interp.Error s->
