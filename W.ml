@@ -1,39 +1,21 @@
-Open Ast 
-Open Parser
+open Ast 
+open Parser
+exception UnificationFailure of types * types
+exception RedifinedVariable of string
+exception NotCallable of types
+exception UnknownAnnotation of type_annotation
+exception WrongCase
 
-
-type typ =
-  | Tint
-  | Tarrow of typ * typ
-  | Tproduct of typ * typ
-  | Tvar of tvar
-
-and tvar =
-  { id : int;
-    mutable def : typ option }
-
-let rec pp_typ fmt = function
-| Tproduct (t1, t2) -> Format.fprintf fmt "%a *@ %a" pp_atom t1 pp_atom t2
-| Tarrow (t1, t2) -> Format.fprintf fmt "%a ->@ %a" pp_atom t1 pp_typ t2
-| (Tint | Tvar _) as t -> pp_atom fmt t
-and pp_atom fmt = function
-| Tint -> Format.fprintf fmt "int"
-| Tvar v -> pp_tvar fmt v
-| Tarrow _ | Tproduct _ as t -> Format.fprintf fmt "@[<1>(%a)@]" pp_typ t
-and pp_tvar fmt = function
-| { def = None; id } -> Format.fprintf fmt "'%d" id
-| { def = Some t; id } -> Format.fprintf fmt "@[<1>('%d := %a)@]" id pp_typ t
-
-
-module V = struct
+module V = struct 
   type t = tvar
-  let compare v1 v2 = Stdlib.compare v1.id v2.id
-  let equal v1 v2 = v1.id = v2.id
-  let create = let r = ref 0 in fun () -> incr r; { id = !r; def = None }
+  let compare v1 v2 = Stdlib.compare v1.id v2.id 
+  let equal v1 v2 = v1.id = v2.id 
+  let create = let r = ref 0 in fun () -> 
+    incr r;
+    { id = !r; def = None }
 end
 
-
-let rec head (t:typ): typ = 
+let rec head (t:types): types =
   match t with
   | Tvar tv -> begin
     match tv.def with 
@@ -45,215 +27,304 @@ let rec head (t:typ): typ =
 let rec canon t = 
   let t' = head t in 
   match t' with 
-  | Tint -> t' 
-  | Tarrow (x,y) -> Tarrow(canon x, canon y)
+  | Tvar _ | Tint | Tstr | Tboolean 
+  | Tany | Tnothing | Talpha _ -> t' 
+  | Tfun (x,y) -> Tfun(List.map canon x, canon y)
   | Tproduct (x,y) -> Tproduct(canon x, canon y)
-  | Tvar _ -> t'
+  | Tlist x -> Tlist (canon x)
 
-let () =
-  let a = V.create () in
-  let b = V.create () in
-  let ta = Tvar a in
-  let tb = Tvar b in
-  assert (head ta == ta);
-  assert (head tb == tb);
-  let ty = Tarrow (ta, tb) in
-  a.def <- Some tb;
-  assert (head ta == tb);
-  assert (head tb == tb);
-  b.def <- Some Tint;
-  assert (head ta = Tint);
-  assert (head tb = Tint);
-  assert (canon ta = Tint);
-  assert (canon tb = Tint);
-  assert (canon ty = Tarrow (Tint, Tint))
-
-exception UnificationFailure of typ * typ
-
-let unification_error t1 t2 = raise (UnificationFailure (canon t1, canon t2))
-
-
-let rec occur (tv : tvar)(t : typ) : bool = 
-  (* Pourquoi head ? par ce que c'est récursif*)
+let rec occur (tv : tvar)(t : types) : bool = 
   match head t with 
   | Tvar tv' when tv.id = tv'.id -> true 
-  | Tvar tv' -> begin match tv'.def with Some t'' -> occur tv t'' | None -> false end
-  | Tarrow(x,y) | Tproduct(x,y) -> occur tv x || occur tv y 
-  | Tint -> false 
+  | Tvar tv' -> begin match tv'.def with
+      | Some t'' -> occur tv t''
+      | None -> false end
+  | Tfun(x,y) -> List.exists (occur tv) x || occur tv y
+  | Tproduct(x,y) -> occur tv x || occur tv y 
+  | Tint | Tstr | Tany | Tnothing | Tboolean | Talpha _ -> false
+  | Tlist x -> occur tv x
 
+let unification_error t1 t2 =
+  raise (UnificationFailure (canon t1, canon t2))
 
-
-let rec unify (t : typ)(t':typ): unit = 
+let rec unify (t : types) (t':types): unit = 
   match head t, head t' with 
-  | Tarrow(x1,y1),Tarrow(x2,y2) | Tproduct(x1,y1),Tproduct(x2,y2) -> unify x1 x2 ; unify y1 y2 
-  | Tint, Tint -> () 
-  | Tvar tv1, Tvar tv2 -> unify (Option.get tv1.def) (Option.get tv2.def) 
-  | Tvar tv, x | x, Tvar tv -> tv.def<-Some x
+  | Tfun (x1,y1), Tfun (x2,y2) -> List.iter2 unify x1 x2; unify y1 y2
+  | Tproduct(x1,y1),Tproduct(x2,y2) -> unify x1 x2 ; unify y1 y2
+
+  | Tint, Tint | Tstr, Tstr | Tany, Tany | Tnothing, Tnothing 
+  | Tboolean, Tboolean -> ()
+
+  | Tlist x, Tlist y -> unify x y
+  | Tvar tv, Tvar tv' -> begin
+      match tv.def, tv'.def with
+      | None, _ -> tv.def <- Some (Tvar tv')
+      | _, None -> tv'.def <- Some (Tvar tv)
+      | Some t1, Some t2 -> unify t1 t2 end
+  | Tvar tv, x | x, Tvar tv -> begin
+      match tv.def with
+      | None -> tv.def <- Some x
+      | Some t1 -> unify t1 x end
+  | Talpha x, Talpha y when x = y -> ()
   | _ -> unification_error t t'
-
-let () =
-  let a = V.create () in
-  let b = V.create () in
-  let ta = Tvar a in
-  let tb = Tvar b in
-  assert (occur a ta);
-  assert (occur b tb);
-  assert (not (occur a tb));
-  let ty = Tarrow (ta, tb) in
-  assert (occur a ty);
-  assert (occur b ty);
-  (* unifie 'a-> 'b et int->int *)
-  unify ty (Tarrow (Tint, Tint));
-  assert (canon ta = Tint);
-  assert (canon ty = Tarrow (Tint, Tint));
-  (* unifie 'c et int->int *)
-  let c = V.create () in
-  let tc = Tvar c in
-  unify tc ty;
-  assert (canon tc = Tarrow (Tint, Tint))
-
-let cant_unify ty1 ty2 =
-  try let _ = unify ty1 ty2 in false with UnificationFailure _ -> true
-
-let () =
-  assert (cant_unify Tint (Tarrow (Tint, Tint)));
-  assert (cant_unify Tint (Tproduct (Tint, Tint)));
-  let a = V.create () in
-  let ta = Tvar a in
-  unify ta (Tarrow (Tint, Tint));
-  assert (cant_unify ta Tint)
-
 
 module Vset = Set.Make(V)
 
-let rec fvars (t : typ) : Vset.t = 
+let rec fvars (t : types) : Vset.t = 
   match head t with 
-  | Tint -> Vset.empty
-  | Tarrow (x,y) | Tproduct(x,y) -> Vset.union (fvars x) (fvars y)
+  | Tint | Tstr | Tboolean | Talpha _ | Tany | Tnothing -> Vset.empty
+  | Tfun (x,y) ->
+      List.fold_left (fun a b -> Vset.union a (fvars b)) (fvars y) x
+  | Tproduct(x,y) -> Vset.union (fvars x) (fvars y)
+  | Tlist x -> fvars x
   | Tvar tv -> Vset.singleton tv
-  
-
-let () =
-  assert (Vset.is_empty (fvars (Tarrow (Tint, Tint))));
-  let a = V.create () in
-  let ta = Tvar a in
-  let ty = Tarrow (ta, ta) in
-  assert (Vset.equal (fvars ty) (Vset.singleton a));
-  unify ty (Tarrow (Tint, Tint));
-  assert (Vset.is_empty (fvars ty))
-
-type schema = { vars : Vset.t; typ : typ }
 
 module Smap = Map.Make(String)
+module Sset = Set.Make(String)
+type schema = { vars : Sset.t; typ : types }
 
-type env = { bindings : schema Smap.t; fvars : Vset.t }
+type env = {
+  bindings : schema Smap.t;
+  var_bindings : types Smap.t;
+  types : Sset.t;
+  fvars : Vset.t }
 
-let empty = {bindings = Smap.empty ; fvars = Vset.empty}
+let rec bien_forme environment typ = 
+  match head typ with
+  | Tint | Tstr | Tboolean | Tany | Tnothing -> true
+  | Tfun (x,y) -> List.for_all (bien_forme environment) x
+    && bien_forme environment y
+  | Tproduct (x,y) ->
+      bien_forme environment x && bien_forme environment y
+  | Tlist x -> bien_forme environment x
+  | Talpha x -> Sset.mem x environment.types
+  | Tvar _ -> false (* Je ne sais pas quoi faire ici *)
 
-(* val add : string -> typ -> env -> env *)
+let start_environment = {
+  bindings = Smap.of_list [
+    "nothing", { vars = Sset.empty; typ = Tnothing };
+    "num-modulo", {
+      vars = Sset.empty; typ = Tfun ([Tint; Tint], Tint)
+    };
+    "empty", { vars = Sset.singleton "A"; typ = Tlist (Talpha "A") };
+    "link", {
+      vars = Sset.singleton "A";
+      typ = Tfun ([Talpha "A"; Tlist (Talpha "A")],
+          Tlist (Talpha "A"))
+    };
+    "print", {
+      vars = Sset.singleton "A";
+      typ = Tfun ([Talpha "A"], Talpha "A")
+    };
+    "raise", {
+      vars = Sset.singleton "A";
+      typ = Tfun ([Tstr], Talpha "A")
+    };
+    "each", {
+      vars = Sset.of_list ["A";"B"];
+      typ = Tfun ([Tfun ([Talpha "A"], Talpha "B"); Tlist (Talpha "A")], Tnothing)
+    };
+    "fold", {
+      vars = Sset.of_list ["A"; "B"];
+      typ = Tfun ([
+        Tfun ([Talpha "A"; Talpha "B"], Talpha "A");
+        Talpha "A";
+        Tlist (Talpha "B")],
+        Talpha "A")
+    }
+  ];
+  var_bindings = Smap.empty;
+  types = Sset.empty;
+  fvars = Vset.empty;
+}
 
-let add (s : string)(t : typ) (e : env) : env = 
-  let schem = {vars = Vset.empty ; typ = t} in 
-  let bindings' = Smap.add s schem e.bindings in 
-  let fvars' = Vset.union e.fvars (fvars t) in 
-  {bindings = bindings'; fvars = fvars'}
+let add_bind environment name typ =
+  if Smap.mem name environment.bindings ||
+      Smap.mem name environment.var_bindings
+  then raise (RedifinedVariable name)
+  else 
+    let scheme = {vars = Sset.empty; typ = typ} in
+    let fvars = Vset.union environment.fvars (fvars typ) in
+    {
+      bindings = Smap.add name scheme environment.bindings;
+      var_bindings = environment.var_bindings;
+      types = environment.types;
+      fvars = fvars
+    }
 
-let add_gen (s : string)(t : typ)(e : env) : env = 
-  let free_vars = Vset.diff (fvars t) (e.fvars) in 
-  let schem = {vars = free_vars ; typ = t} in  
-  let bindings' = Smap.add s schem e.bindings in 
-  {bindings = bindings'; fvars = e.fvars}
+let add_var environment name typ = 
+  if Smap.mem name environment.bindings ||
+      Smap.mem name environment.var_bindings
+  then raise (RedifinedVariable name)
+  else
+    let fvars = Vset.union environment.fvars (fvars typ) in
+    {
+      bindings = environment.bindings;
+      var_bindings = Smap.add name typ environment.var_bindings;
+      types = environment.types;
+      fvars = fvars
+    }
+
+let add_poly environment poly = 
+  let def_types = Sset.of_list
+      ["Number"; "Any"; "Boolean"; "Nothing"; "String"] in
+  let add_one env p =
+    if Sset.mem p env.types || Sset.mem p def_types 
+    then raise (RedifinedVariable p)
+    else
+      {
+        bindings = environment.bindings;
+        var_bindings = environment.var_bindings;
+        types = Sset.add p environment.types;
+        fvars = environment.fvars
+    }
+  in List.fold_left add_one environment poly
+
+let add_schema environment name s =
+  if Smap.mem name environment.bindings ||
+      Smap.mem name environment.var_bindings
+  then raise (RedifinedVariable name)
+  else
+    {
+      bindings = Smap.add name s environment.bindings;
+      var_bindings = environment.var_bindings;
+      types = environment.types;
+      fvars = environment.fvars
+    }
+  
+
+let rec read_ta environment ta = 
+  match ta with
+  | Taundef -> Tvar (V.create ())
+  | Talist (id, typs) -> begin
+      if id <> "List" then raise (UnknownAnnotation ta)
+      else
+      match typs with
+      | [x] -> Tlist (read_ta environment x)
+      | _ -> raise (UnknownAnnotation ta) end
+  | Tafun (talist, ta) ->
+      Tfun (List.map (read_ta environment) talist,
+      read_ta environment ta)
+  | Ta id -> begin
+      match id with
+      | "Number" -> Tint
+      | "Any" -> Tany
+      | "Boolean" -> Tboolean
+      | "Nothing" -> Tnothing
+      | "String" -> Tstr
+      | _ ->
+          if Sset.mem id environment.types then Talpha id 
+          else raise (UnknownAnnotation ta)
+      end
+
+let find e id = 
+  if Smap.mem id e.var_bindings then Smap.find id e.var_bindings
+  else 
+    let s = Smap.find id e.bindings in
+    let rec fresh_type quant maps t = 
+      match head t with
+      | Tany | Tnothing | Tboolean | Tstr | Tint -> head t
+      | Tlist x -> Tlist (fresh_type quant maps x)
+      | Tfun (t_list, tret) ->
+          Tfun (List.map (fresh_type quant maps) t_list,
+            fresh_type quant maps t)
+      | Tproduct (t1, t2) -> Tproduct (fresh_type quant maps t1,
+          fresh_type quant maps t1)
+      | Talpha a -> if Hashtbl.mem maps a then Hashtbl.find maps a
+          else if Sset.mem a quant
+            then let newmap = Tvar (V.create ()) in 
+            (Hashtbl.add maps a newmap; newmap)
+          else Talpha a
+      | Tvar t -> Tvar t in
+    fresh_type s.vars (Hashtbl.create 16) s.typ
+
+let rec w environment stmts =
+  let (_, ret_type) = List.fold_left
+    (fun (e,t) s -> w_stmt e s) (environment, Tnothing) stmts 
+  in ret_type 
+
+and w_stmt environment stmt = 
+  match stmt with 
+  | Sexpr e -> (environment, w_expr e environment)
+  | Saffect (id,e) -> begin
+    unify (Smap.find id environment.var_bindings)
+          (w_expr e environment);
+    (environment, Smap.find id environment.var_bindings)
+  end
+  | Svar (id, ta, e) ->
+    let r_type = read_ta environment ta in begin
+      unify r_type (w_expr e environment);
+      (add_var environment id r_type, Tnothing) end
+  | Sconst (id, poly, ta, e) ->
+    let new_env = add_poly environment poly in
+    let ret_type = read_ta new_env ta in 
+    (unify ret_type (w_expr e new_env);
+    add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
+    Tnothing)
 
 
-let find (s : string)(e : env) : typ = 
-  let schem = Smap.find s e.bindings in 
-  let new_variables = ref [] in 
-  let rec explore_type t' : typ =
-    match head t' with 
-    | Tint -> Tint 
-    | Tarrow(x,y) -> Tarrow(explore_type x, explore_type y)
-    | Tproduct(x,y) -> Tproduct(explore_type x, explore_type y)
-    | Tvar tv -> 
-      try Tvar (List.assoc tv !new_variables)
-      with Not_found -> let new_tv = V.create () in new_variables := (tv, new_tv) :: !new_variables ; Tvar new_tv
-  in 
-  explore_type schem.typ
+and w_expr exp environment = 
+  match exp with
+  | Bexpr (op,e1,e2) ->  begin match op with 
+    | Badd | Bsub | Bmul | Bdiv -> begin 
+      unify (w_expr e1 environment) Tint;
+      unify (w_expr e2 environment) Tint;
+      Tint
+    end
+    | Beq | Bneq -> begin
+      w_expr e1 environment;
+      w_expr e2 environment;
+      Tboolean
+    end 
+    | Band | Bor -> begin
+      unify (w_expr e1 environment) Tboolean;
+      unify (w_expr e2 environment) Tboolean;
+      Tboolean
+    end 
+    | Ble | Blt | Bge | Bgt -> begin
+      unify (w_expr e1 environment) Tint;
+      unify (w_expr e2 environment) Tint;
+      Tboolean
+    end end
+  | Ecst cst -> begin match cst with 
+      | Cbool _ -> Tboolean
+      | Cint  _ -> Tint
+      | Cstr  _ -> Tstr
+    end
+  | Evar id -> find environment id
+  | Eblock b -> w environment b
+  | Eif (e1, e2, e3) -> begin
+      unify (w_expr e1 environment) Tboolean;
+      let ret_type = w_expr e2 environment in
+      unify ret_type (w_expr e3 environment);
+      ret_type
+    end
+  | Ecall (func, args) ->
+      let f_type = w_expr func environment in begin
+      match f_type with
+      | Tfun (targs, tret) -> (
+          List.iter2 (fun x y -> unify x (w_expr y environment))
+              targs args;
+          tret)
+      | _ -> raise (NotCallable f_type) end
+  | Ecases (ta, e, branches) ->
+      let t = w_expr e environment in begin
+      unify t (Tlist (Tvar (V.create ())));
+      unify t (read_ta environment ta);
+      match branches with
+      | (Branch1 ("empty", be))::(Branch2 ("link", [x;y], bl))::[]
+      | (Branch2 ("link", [x;y], bl))::(Branch1 ("empty", be))::[] ->
+          let new_env = add_bind (add_bind environment x t) y (Tlist t) in
+          let t_ret = w new_env bl in
+          begin unify t_ret (w environment be);
+          t_ret end
+      | _ -> raise WrongCase
+      end
 
+  | Elam (Funbody (params, ta, b)) -> 
+      let new_env = List.fold_left
+      (fun e (id,t_a) -> add_bind e id (read_ta environment t_a))
+      environment params in
+      let r_type = w new_env b in 
+      (unify r_type (read_ta new_env ta); r_type)
 
-type expression =
-  | Var of string
-  | Const of int
-  | Op of string
-  | Fun of string * expression
-  | App of expression * expression
-  | Pair of expression * expression
-  | Let of string * expression * expression
-
-
-let rec w (e : env)(expr : expression) : typ = 
-  match expr with
-  | Var s -> find s e
-  | Const n -> Tint 
-  | Op x -> find x e 
-  | Pair(x,y) -> Tproduct(w e x, w e y)
-  | Fun(x,exp) -> let new_tv = V.create () in  Tarrow(Tvar new_tv, w (add x (Tvar new_tv) e) exp)
-  | App(f,x) -> 
-    let t1 = w e f in 
-    let t2 = w e x in 
-    let t' = Tvar (V.create()) in
-    unify t1 (Tarrow(t2,t')) ;
-    t'
-  | Let(x, e1, e2) -> 
-    let t1 = w e e1 in 
-    let t2 = w (add_gen x t1 e) e2 in t2
-
-let typeof e = canon (w empty e)
-
-(* 1 : int *)
-let () = assert (typeof (Const 1) = Tint)
-
-(* fun x -> x : 'a -> 'a *)
-let () = assert (match typeof (Fun ("x", Var "x")) with
-  | Tarrow (Tvar v1, Tvar v2) -> V.equal v1 v2
-  | _ -> false)
-
-(* fun x -> x+1 : int -> int *)
-let () = assert (typeof (Fun ("x", App (Op "+", Pair (Var "x", Const 1))))
-                 = Tarrow (Tint, Tint))
-
-(* fun x -> x+x : int -> int *)
-let () = assert (typeof (Fun ("x", App (Op "+", Pair (Var "x", Var "x"))))
-                 = Tarrow (Tint, Tint))
-
-(* let x = 1 in x+x : int *)
-let () =
-  assert (typeof (Let ("x", Const 1, App (Op "+", Pair (Var "x", Var "x"))))
-          = Tint)
-
-(* let id = fun x -> x in id 1 *)
-let () =
-  assert (typeof (Let ("id", Fun ("x", Var "x"), App (Var "id", Const 1)))
-          = Tint)
-
-(* let id = fun x -> x in id id 1 *)
-let () =
-  assert (typeof (Let ("id", Fun ("x", Var "x"),
-		       App (App (Var "id", Var "id"), Const 1)))
-          = Tint)
-
-(* let id = fun x -> x in (id 1, id (1,2)) : int * (int * int) *)
-let () =
-  assert (typeof (Let ("id", Fun ("x", Var "x"),
-		       Pair (App (Var "id", Const 1),
-			     App (Var "id", Pair (Const 1, Const 2)))))
-          = Tproduct (Tint, Tproduct (Tint, Tint)))
-
-(* app = fun f x -> let y = f x in y : ('a -> 'b) -> 'a -> 'b *)
-let () =
-  let ty =
-    typeof (Fun ("f", Fun ("x", Let ("y", App (Var "f", Var "x"), Var "y"))))
-  in
-  assert (match ty with
-    | Tarrow (Tarrow (Tvar v1, Tvar v2), Tarrow (Tvar v3, Tvar v4)) ->
-        V.equal v1 v3 && V.equal v2 v4
-    | _ -> false)

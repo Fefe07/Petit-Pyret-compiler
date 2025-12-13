@@ -2,7 +2,7 @@ type binop =
   | Badd
   | Bsub
   | Bmul
-  | Bdiv (* + - * /  *)
+  | Bdiv
   | Beq
   | Bneq
   | Blt
@@ -15,7 +15,8 @@ type binop =
 type ident = string
 
 type types =
-  | Talpha
+  | Tvar of tvar
+  | Talpha of ident
   | Tany
   | Tboolean
   | Tint
@@ -23,7 +24,9 @@ type types =
   | Tlist of types
   | Tnothing
   | Tproduct of types * types
-  | Tfun of types * types
+  | Tfun of types list * types
+
+and tvar = { id:int; mutable def : types option }
 
 type type_annotation =
   | Taundef
