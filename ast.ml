@@ -25,6 +25,7 @@ type types =
   | Tnothing
   | Tproduct of types * types
   | Tfun of types list * types
+  | Tintstr
 
 and tvar = { id:int; mutable def : types option }
 
@@ -41,8 +42,8 @@ type stmt =
   | Sexpr of expr
   | Saffect of ident * expr
   | Svar of ident * type_annotation * expr
-  | Sconst of
-      ident * string list * type_annotation * expr (*Types génériques ajoutés*)
+  | Sconst of ident * type_annotation * expr 
+  | Sfun of ident * ident list * param list * type_annotation * block
 
 and block = stmt list
 

@@ -78,20 +78,25 @@ stmt:
 
 stmt_init:
   (*Function declaration*)
-  | FUN; id = IDENT; x = funbody {Sconst (id, [], Taundef, Elam x)}
+  | FUN; id = IDENT; x = funbody
+    {let Funbody (params, ret, b) = x in 
+    Sfun (id, [], params, ret, b)}
   | FUN; id = IDENT; LEFT_CHEV ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
-  {Sconst (id, l, Taundef, Elam x)}
+  {let Funbody (params, ret, b) = x in 
+    Sfun (id, l, params, ret, b)}
   (*Deguelasse mais au moins ça marche *)
   | FUN; id = IDENT; LT ; l = polymorph_args ; RIGHT_CHEV; x = funbody 
-  {(*(if b <> Blt then 
+  {let Funbody (params, ret, b) = x in 
+      Sfun (id, l, params, ret, b)}
+  (*{(if b <> Blt then 
   failwith "Erreur syntaxique : opérateur binaire autre que < 
-    après un nom de fonction");*)
-  Sconst (id, l, Taundef, Elam x)}
+    après un nom de fonction");
+  Sconst (id, l, Taundef, Elam x)}*)
   (*Variable declaration*)
   | VAR; id = IDENT; DBLCOLON; t = typ; EQUAL; e = bexpr {Svar (id, t, e)}
   | VAR; id = IDENT; EQUAL; e = bexpr {Svar (id, Taundef, e)}
-  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, [],t, e)}
-  | id = IDENT; EQUAL; e = bexpr {Sconst (id, [], Taundef, e)}
+  | id = IDENT;  DBLCOLON; t = typ;  EQUAL; e = bexpr {Sconst (id, t, e)}
+  | id = IDENT; EQUAL; e = bexpr {Sconst (id, Taundef, e)}
 
 stmt_final:
   | id = IDENT; DEF; e = bexpr {Saffect (id, e)}

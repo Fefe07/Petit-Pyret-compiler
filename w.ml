@@ -31,7 +31,7 @@ let rec canon t =
   let t' = head t in 
   match t' with 
   | Tvar _ | Tint | Tstr | Tboolean 
-  | Tany | Tnothing | Talpha _ -> t' 
+  | Tany | Tnothing | Tintstr | Talpha _ -> t' 
   | Tfun (x,y) -> Tfun(List.map canon x, canon y)
   | Tproduct (x,y) -> Tproduct(canon x, canon y)
   | Tlist x -> Tlist (canon x)
@@ -45,7 +45,7 @@ let rec occur (tv : tvar)(t : types) : bool =
       | None -> false end
   | Tfun(x,y) -> List.exists (occur tv) x || occur tv y
   | Tproduct(x,y) -> occur tv x || occur tv y 
-  | Tint | Tstr | Tany | Tnothing | Tboolean | Talpha _ -> false
+  | Tint | Tstr | Tany | Tnothing | Tboolean | Talpha _ | Tintstr-> false
   | Tlist x -> occur tv x
 
 let unification_error t1 t2 =
@@ -64,7 +64,7 @@ let rec unify (t : types) (t':types): unit =
   | Tproduct(x1,y1),Tproduct(x2,y2) -> unify x1 x2 ; unify y1 y2
 
   | Tint, Tint | Tstr, Tstr | Tany, Tany | Tnothing, Tnothing 
-  | Tboolean, Tboolean -> ()
+  | Tboolean, Tboolean | Tintstr, Tintstr -> ()
 
   | Tlist x, Tlist y -> unify x y
   | Tvar tv, Tvar tv' -> begin
@@ -83,7 +83,7 @@ module Vset = Set.Make(V)
 
 let rec fvars (t : types) : Vset.t = 
   match head t with 
-  | Tint | Tstr | Tboolean | Talpha _ | Tany | Tnothing -> Vset.empty
+  | Tint | Tstr | Tboolean | Talpha _ | Tany | Tnothing | Tintstr -> Vset.empty
   | Tfun (x,y) ->
       List.fold_left (fun a b -> Vset.union a (fvars b)) (fvars y) x
   | Tproduct(x,y) -> Vset.union (fvars x) (fvars y)
@@ -105,7 +105,7 @@ type env = {
 let rec bien_forme environment typ = 
   (* Vérifie que toutes les types polymorphes sont bien définis ? *)
   match head typ with
-  | Tint | Tstr | Tboolean | Tany | Tnothing -> true
+  | Tint | Tstr | Tboolean | Tany | Tnothing | Tintstr -> true
   | Tfun (x,y) -> List.for_all (bien_forme environment) x
     && bien_forme environment y
   | Tproduct (x,y) ->
@@ -211,7 +211,8 @@ let rec sous_type t' t =
   | _, Tany -> ()
   | Tlist x, Tlist y -> sous_type x y
   | Tint, Tint | Tstr, Tstr | Tnothing, Tnothing 
-  | Tboolean, Tboolean -> ()
+  | Tboolean, Tboolean | Tint, Tintstr | Tstr, Tintstr 
+  | Tintstr, Tintstr -> ()
   | Tproduct(x1,y1),Tproduct(x2,y2) ->
       sous_type x1 x2 ; sous_type y1 y2
   | Tfun (x1,y1), Tfun (x2,y2) -> begin
@@ -266,7 +267,7 @@ let find e id =
     let s = Smap.find id e.bindings in
     let rec fresh_type quant maps t = 
       match head t with
-      | Tany | Tnothing | Tboolean | Tstr | Tint -> head t
+      | Tany | Tnothing | Tboolean | Tstr | Tint | Tintstr -> head t
       | Tlist x -> Tlist (fresh_type quant maps x)
       | Tfun (t_list, tret) ->
           Tfun (List.map (fresh_type quant maps) t_list,
@@ -300,23 +301,43 @@ and w_stmt environment stmt =
     let r_type = read_ta environment ta in begin
       sous_type (w_expr e environment) r_type;
       (add_var environment id r_type, Tnothing) end
-  | Sconst (id, poly, ta, e) ->
-    let new_env = add_poly environment poly in
-    let ret_type = read_ta new_env ta in 
-    let t = (w_expr e new_env) in (
-    sous_type t ret_type;
-    add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
-    Tnothing)
+  | Sconst (id, ta, e) ->
+    let ret_type = read_ta environment ta in
+    (sous_type (w_expr e environment) ret_type;
+    (add_bind environment id ret_type, Tnothing))
 
+  | Sfun (id, poly, params, ta, e) -> 
+    let env_poly = add_poly environment poly in
+    let env_params = List.fold_left
+      (fun e (id,t_a) -> add_bind e id (read_ta env_poly t_a))
+      env_poly params in
+    let start_types = List.fold_right (
+      fun (id, t_a) l -> (read_ta env_poly t_a)::l
+    ) params [] in
+    let ret_type = read_ta env_poly ta in 
+    let new_env = add_schema env_params id {
+      vars = Sset.of_list poly;
+      typ = (Tfun (start_types, ret_type))
+    } in 
+    (sous_type (w new_env e) ret_type);
+    (add_schema environment id {
+      vars = Sset.of_list poly;
+      typ = (Tfun (start_types, ret_type))
+    },
+    Tnothing)
 
 and w_expr exp environment = 
   match exp with
   | Bexpr (op,e1,e2) ->  begin match op with 
-    | Badd | Bsub | Bmul | Bdiv -> begin 
+    | Bsub | Bmul | Bdiv -> begin 
       unify (w_expr e1 environment) Tint;
       unify (w_expr e2 environment) Tint;
       Tint
     end
+    | Badd -> let t = (w_expr e1 environment ) in begin
+      unify t (w_expr e2 environment);
+      sous_type t Tintstr;
+      t end
     | Beq | Bneq -> begin
       let _ = w_expr e1 environment in 
       let _ = w_expr e2 environment in 
