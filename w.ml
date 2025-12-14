@@ -33,7 +33,6 @@ let rec canon t =
   | Tvar _ | Tint | Tstr | Tboolean 
   | Tany | Tnothing | Tintstr | Talpha _ -> t' 
   | Tfun (x,y) -> Tfun(List.map canon x, canon y)
-  | Tproduct (x,y) -> Tproduct(canon x, canon y)
   | Tlist x -> Tlist (canon x)
 
 let rec occur (tv : tvar)(t : types) : bool = 
@@ -44,7 +43,6 @@ let rec occur (tv : tvar)(t : types) : bool =
       | Some t'' -> occur tv t''
       | None -> false end
   | Tfun(x,y) -> List.exists (occur tv) x || occur tv y
-  | Tproduct(x,y) -> occur tv x || occur tv y 
   | Tint | Tstr | Tany | Tnothing | Tboolean | Talpha _ | Tintstr-> false
   | Tlist x -> occur tv x
 
@@ -61,7 +59,6 @@ let rec unify (t : types) (t':types): unit =
         unify y1 y2
       with | Invalid_argument _ -> raise (UnificationFailure (t,t'))
     end
-  | Tproduct(x1,y1),Tproduct(x2,y2) -> unify x1 x2 ; unify y1 y2
 
   | Tint, Tint | Tstr, Tstr | Tany, Tany | Tnothing, Tnothing 
   | Tboolean, Tboolean | Tintstr, Tintstr -> ()
@@ -86,7 +83,6 @@ let rec fvars (t : types) : Vset.t =
   | Tint | Tstr | Tboolean | Talpha _ | Tany | Tnothing | Tintstr -> Vset.empty
   | Tfun (x,y) ->
       List.fold_left (fun a b -> Vset.union a (fvars b)) (fvars y) x
-  | Tproduct(x,y) -> Vset.union (fvars x) (fvars y)
   | Tlist x -> fvars x
   | Tvar tv -> Vset.singleton tv
 
@@ -108,8 +104,6 @@ let rec bien_forme environment typ =
   | Tint | Tstr | Tboolean | Tany | Tnothing | Tintstr -> true
   | Tfun (x,y) -> List.for_all (bien_forme environment) x
     && bien_forme environment y
-  | Tproduct (x,y) ->
-      bien_forme environment x && bien_forme environment y
   | Tlist x -> bien_forme environment x
   | Talpha x -> Sset.mem x environment.types
   | Tvar _ -> false (* Je ne sais pas quoi faire ici *)
@@ -152,13 +146,36 @@ let start_environment = {
   fvars = Vset.empty;
 }
 
+let generalize typ fvars =
+  let matches = Hashtbl.create 16 in
+  let rec replace typ = 
+    match head typ with
+    | Tany | Tnothing | Tint | Tstr | Tintstr | Tboolean 
+    | Talpha _ -> head typ
+    | Tlist t -> Tlist (replace t)
+    | Tfun (args, ret) -> Tfun (List.map replace args, replace ret)
+    | Tvar v -> 
+        if Vset.mem v fvars then (Tvar v)
+        else if Hashtbl.mem matches v
+          then Talpha (Hashtbl.find matches v)
+        else (
+          Hashtbl.replace matches v (string_of_int (Hashtbl.length matches));
+          Talpha (Hashtbl.find matches v))
+
+  in let new_t = replace typ in
+  (Hashtbl.fold (fun _ key set -> Sset.add key set) matches Sset.empty,
+  new_t)
+
 let add_bind environment name typ =
+  if name = "_" then environment 
+  else
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
   then raise (RedefinedVariable name)
   else
-    let scheme = {vars = Sset.empty; typ = typ} in
-    let fvars = Vset.union environment.fvars (fvars typ) in
+    let vars, new_typ = generalize typ environment.fvars in
+    let scheme = {vars = vars; typ = new_typ} in
+    let fvars = environment.fvars in
     {
       bindings = Smap.add name scheme environment.bindings;
       var_bindings = environment.var_bindings;
@@ -167,6 +184,8 @@ let add_bind environment name typ =
     }
 
 let add_var environment name typ = 
+  if name = "_" then environment 
+  else
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
   then raise (RedefinedVariable name)
@@ -213,8 +232,6 @@ let rec sous_type t' t =
   | Tint, Tint | Tstr, Tstr | Tnothing, Tnothing 
   | Tboolean, Tboolean | Tint, Tintstr | Tstr, Tintstr 
   | Tintstr, Tintstr -> ()
-  | Tproduct(x1,y1),Tproduct(x2,y2) ->
-      sous_type x1 x2 ; sous_type y1 y2
   | Tfun (x1,y1), Tfun (x2,y2) -> begin
       try
         List.iter2 sous_type x2 x1;
@@ -272,8 +289,6 @@ let find e id =
       | Tfun (t_list, tret) ->
           Tfun (List.map (fresh_type quant maps) t_list,
             fresh_type quant maps tret)
-      | Tproduct (t1, t2) -> Tproduct (fresh_type quant maps t1,
-          fresh_type quant maps t1)
       | Talpha a -> if Hashtbl.mem maps a then Hashtbl.find maps a
           else if Sset.mem a quant
             then let newmap = Tvar (V.create ()) in 

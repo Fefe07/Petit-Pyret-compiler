@@ -23,7 +23,6 @@ type types =
   | Tstr
   | Tlist of types
   | Tnothing
-  | Tproduct of types * types
   | Tfun of types list * types
   | Tintstr
 
