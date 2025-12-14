@@ -42,7 +42,8 @@ type stmt =
   | Saffect of ident * expr
   | Svar of ident * type_annotation * expr
   | Sconst of
-      ident * string list * type_annotation * expr (*Types génériques ajoutés*)
+      ident * string list * type_annotation * expr 
+      (*Types génériques ajoutés*)
 
 and block = stmt list
 

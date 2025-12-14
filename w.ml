@@ -28,6 +28,9 @@ let rec head (t:types): types =
   | _ -> t
 
 let rec canon t = 
+  (* Forme canonique *)
+  (* Hérité d'un TP *)
+  (* Pas utile pour l'instant, peut-être pour la curryfication ?*)
   let t' = head t in 
   match t' with 
   | Tvar _ | Tint | Tstr | Tboolean 
@@ -93,17 +96,19 @@ let rec fvars (t : types) : Vset.t =
 module Smap = Map.Make(String)
 module Sset = Set.Make(String)
 
-type schema = { vars : Sset.t; typ : types }
+type schema = { vars : Vset.t; typ : types }
 
 
 type env = {
   bindings : schema Smap.t;
-  var_bindings : types Smap.t;
-  types : Sset.t;
+  var_bindings : types Smap.t; 
+  (* On distingue un type quantifié d'un type non quantifié*)
+  types : Sset.t; (* Liste des types rajoutés ('a, b' ...)*)
   fvars : Vset.t }
 
 let rec bien_forme environment typ = 
   (* Vérifie que toutes les types polymorphes sont bien définis ? *)
+  (* Ne sert à rien pour l'instant... *)
   match head typ with
   | Tint | Tstr | Tboolean | Tany | Tnothing -> true
   | Tfun (x,y) -> List.for_all (bien_forme environment) x
@@ -115,37 +120,38 @@ let rec bien_forme environment typ =
   | Tvar _ -> false (* Je ne sais pas quoi faire ici *)
 
 let start_environment = {
+  (* Définit les types des fonctions et constructeurs natifs à Petit-Pyret*)
   bindings = Smap.of_list [
-    "nothing", { vars = Sset.empty; typ = Tnothing };
+    "nothing", { vars = Vset.empty; typ = Tnothing };
     "num-modulo", {
-      vars = Sset.empty; typ = Tfun ([Tint; Tint], Tint)
+      vars = Vset.empty; typ = Tfun ([Tint; Tint], Tint)
     };
-    "empty", { vars = Sset.singleton "A"; typ = Tlist (Talpha "A") };
-    "link", {
-      vars = Sset.singleton "A";
-      typ = Tfun ([Talpha "A"; Tlist (Talpha "A")],
-          Tlist (Talpha "A"))
-    };
-    "print", {
-      vars = Sset.singleton "A";
-      typ = Tfun ([Talpha "A"], Talpha "A")
-    };
-    "raise", {
-      vars = Sset.singleton "A";
-      typ = Tfun ([Tstr], Talpha "A")
-    };
-    "each", {
-      vars = Sset.of_list ["A";"B"];
-      typ = Tfun ([Tfun ([Talpha "A"], Talpha "B"); Tlist (Talpha "A")], Tnothing)
-    };
-    "fold", {
-      vars = Sset.of_list ["A"; "B"];
+    "empty", (let a = V.create() in { vars = Vset.singleton a; typ = Tlist (Tvar a) });
+    "link", (let a = V.create() in {
+      vars = Vset.singleton a ;
+      typ = Tfun ([Tvar a ; Tlist (Tvar a)],
+          Tlist (Tvar a))
+    });
+    "print",(let a = V.create() in {
+      vars = Vset.singleton a;
+      typ = Tfun ([Tvar a], Tvar a)
+    });
+    "raise", (let a = V.create() in {
+      vars = Vset.singleton a;
+      typ = Tfun ([Tstr], Tvar a)
+    });
+    "each", (let a = V.create() in  let b = V.create() in{
+      vars = Vset.of_list [a;b];
+      typ = Tfun ([Tfun ([Tvar a], Tvar b); Tlist (Tvar a)], Tnothing)
+    });
+    "fold", (let a = V.create() in let b = V.create() in {
+      vars = Vset.of_list [a; b];
       typ = Tfun ([
-        Tfun ([Talpha "A"; Talpha "B"], Talpha "A");
-        Talpha "A";
-        Tlist (Talpha "B")],
-        Talpha "A")
-    }
+        Tfun ([Tvar a; Tvar b], Tvar a);
+        Tvar a;
+        Tlist (Tvar b)],
+        Tvar a)
+    })
   ];
   var_bindings = Smap.empty;
   types = Sset.empty;
@@ -153,11 +159,13 @@ let start_environment = {
 }
 
 let add_bind environment name typ =
+  (* Ajoute une variable non quantifiée 
+     en tant que schema (variable quantifiée) à 0 quantificateurs *)
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
   then raise (RedefinedVariable name)
   else
-    let scheme = {vars = Sset.empty; typ = typ} in
+    let scheme = {vars = Vset.empty; typ = typ} in
     let fvars = Vset.union environment.fvars (fvars typ) in
     {
       bindings = Smap.add name scheme environment.bindings;
@@ -167,6 +175,8 @@ let add_bind environment name typ =
     }
 
 let add_var environment name typ = 
+  (* Ajoute une variable non quantifiée en tant que telle *)
+  (*à l'environnement sans généraliser son type *)
   if Smap.mem name environment.bindings ||
       Smap.mem name environment.var_bindings
   then raise (RedefinedVariable name)
@@ -179,7 +189,7 @@ let add_var environment name typ =
       fvars = fvars
     }
 
-let add_poly environment poly = 
+let add_poly (environment:env) poly = 
   let def_types = Sset.of_list
       ["Number"; "Any"; "Boolean"; "Nothing"; "String";"List"] in
   let add_one env p =
@@ -206,6 +216,16 @@ let add_schema environment name s =
       fvars = environment.fvars
     }
   
+let add_gen env name typ =
+  let free_vars = Vset.diff (fvars typ) env.fvars  in 
+  let schem = {vars = free_vars ; typ = typ} in 
+  { bindings = Smap.add name schem env.bindings ;
+    var_bindings = env.var_bindings ;
+    types = env.types ;
+    fvars = env.fvars}
+
+
+
 
 let rec read_ta environment ta = 
   match ta with
@@ -232,25 +252,30 @@ let rec read_ta environment ta =
       end
 
 let find e id = 
+  (* Trouve une variable/un schema dans l'environnement *)
+  (* Si c'est un schema, remplace les variables quantifiées du schema
+     par des variables de type fraîches *)
   if Smap.mem id e.var_bindings then Smap.find id e.var_bindings
   else try
     let s = Smap.find id e.bindings in
-    let rec fresh_type quant maps t = 
+    let maps = Hashtbl.create 42 in 
+
+    let rec fresh_type quant (*maps*) t = 
       match head t with
       | Tany | Tnothing | Tboolean | Tstr | Tint -> head t
-      | Tlist x -> Tlist (fresh_type quant maps x)
+      | Tlist x -> Tlist (fresh_type quant (*maps*) x)
       | Tfun (t_list, tret) ->
-          Tfun (List.map (fresh_type quant maps) t_list,
-            fresh_type quant maps tret)
-      | Tproduct (t1, t2) -> Tproduct (fresh_type quant maps t1,
-          fresh_type quant maps t1)
-      | Talpha a -> if Hashtbl.mem maps a then Hashtbl.find maps a
-          else if Sset.mem a quant
-            then let newmap = Tvar (V.create ()) in 
-            (Hashtbl.add maps a newmap; newmap)
-          else Talpha a
-      | Tvar t -> Tvar t in
-    fresh_type s.vars (Hashtbl.create 16) s.typ
+          Tfun (List.map (fresh_type quant (*maps*)) t_list,
+            fresh_type quant (*maps*) tret)
+      | Tproduct (t1, t2) -> Tproduct (fresh_type quant (*maps*) t1,
+          fresh_type quant (*maps*) t1)
+      | Talpha a -> Talpha a
+      | Tvar t -> if Hashtbl.mem maps t then Hashtbl.find maps t
+      else if Vset.mem t quant
+        then let newmap = Tvar (V.create ()) in 
+        (Hashtbl.add maps t newmap; newmap)
+      else Tvar t in
+    fresh_type s.vars (* (Hashtbl.create 16) *) s.typ
   with | Not_found -> raise (VariableNotFound id)
 
 let rec w environment stmts =
@@ -272,12 +297,19 @@ and w_stmt environment stmt =
       unify r_type (w_expr e environment);
       (add_var environment id r_type, Tnothing) end
   | Sconst (id, poly, ta, e) ->
-    let new_env = add_poly environment poly in
+    (* Il faut utiliser add_gen *)
+    (* let new_env = add_poly environment poly in
     let ret_type = read_ta new_env ta in 
     let t = (w_expr e new_env) in (
     unify ret_type t;
     add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
-    Tnothing)
+    Tnothing) *)
+
+    (* On laisse tomber poly *)
+    let typ = w_expr e environment in 
+    let new_env = add_gen environment id typ in
+    (new_env, typ)
+    
 
 
 and w_expr exp environment = 
@@ -289,8 +321,9 @@ and w_expr exp environment =
       Tint
     end
     | Beq | Bneq -> begin
-      w_expr e1 environment;
-      w_expr e2 environment;
+      let _ = w_expr e1 environment in 
+      let _ = w_expr e2 environment in 
+      (* Pyret peut comparer deux éléments de types distincts*)
       Tboolean
     end 
     | Band | Bor -> begin

@@ -82,7 +82,7 @@ let () =
   | RedefinedVariable id -> eprintf "Variable redéfinie %s@." id;
       exit 1
   | NotCallable _ -> eprintf "Type not callable @."; exit 1
-  | UnknownAnnotation _ -> eprintf "Annotaion inconnue @."; exit 1
+  | UnknownAnnotation _ -> eprintf "Annotation inconnue @."; exit 1
   | WrongCase -> eprintf "Case inconnu @."; exit 1
   | WrongArgsNumber (x,y) ->
       eprintf "%d argument(s) attendu(s), mais %d reçu(s) @."
