@@ -318,8 +318,8 @@ and w_expr exp environment =
       Tint
     end
     | Beq | Bneq -> begin
-      w_expr e1 environment;
-      w_expr e2 environment;
+      let _ = w_expr e1 environment in 
+      let _ = w_expr e2 environment in 
       Tboolean
     end 
     | Band | Bor -> begin

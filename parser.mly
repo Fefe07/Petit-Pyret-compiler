@@ -272,7 +272,6 @@ fromstar:
 typ:
   | id = IDENT {Ta id}
   | id = IDENT; LEFT_CHEV; t = typ_params {Talist (id,t)}
-  (* Déguelasse mais fonctionnel. Lever d'erreur à améliorer *)
   | id = IDENT; LT; t = typ_params {(*assert(b==Blt);*)  Talist (id,t)}
   | LP; t1 = typestar; t2 = typ RP {Tafun (t1, t2)}
 
