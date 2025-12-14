@@ -25,6 +25,7 @@ type types =
   | Tnothing
   | Tproduct of types * types
   | Tfun of types list * types
+  | Tintstr
 
 and tvar = { id:int; mutable def : types option }
 
