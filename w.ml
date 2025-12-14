@@ -206,6 +206,35 @@ let add_schema environment name s =
       fvars = environment.fvars
     }
   
+let rec sous_type t' t = 
+  match head t', head t with
+  | _, Tany -> ()
+  | Tlist x, Tlist y -> sous_type x y
+  | Tint, Tint | Tstr, Tstr | Tnothing, Tnothing 
+  | Tboolean, Tboolean -> ()
+  | Tproduct(x1,y1),Tproduct(x2,y2) ->
+      sous_type x1 x2 ; sous_type y1 y2
+  | Tfun (x1,y1), Tfun (x2,y2) -> begin
+      try
+        List.iter2 sous_type x2 x1;
+        sous_type y1 y2
+      with | Invalid_argument _ -> raise (UnificationFailure (t,t'))
+    end
+  | Tvar tv', Tvar tv -> begin
+      match tv'.def, tv.def with
+      | None, _ -> tv.def <- Some (Tvar tv')
+      | _, None -> tv'.def <- Some (Tvar tv)
+      | Some t1, Some t2 -> sous_type t1 t2 end
+  | Tvar tv', x -> begin 
+      match tv'.def with 
+      | None -> tv'.def <- Some x
+      | Some x' -> sous_type x' x end 
+  | x', Tvar tv -> begin
+      match tv.def with
+      | None -> tv.def <- Some x'
+      | Some x -> sous_type x' x end
+  | Talpha x, Talpha y when x = y -> ()
+  | _ -> unification_error t t'
 
 let rec read_ta environment ta = 
   match ta with
@@ -263,19 +292,19 @@ and w_stmt environment stmt =
   | Sexpr e -> (environment, w_expr e environment)
   | Saffect (id,e) -> (
     try
-      unify (Smap.find id environment.var_bindings)
-            (w_expr e environment);
+      sous_type (w_expr e environment)
+        (Smap.find id environment.var_bindings);
       (environment, Smap.find id environment.var_bindings)
     with | Not_found -> raise (VariableNotFound id))
   | Svar (id, ta, e) ->
     let r_type = read_ta environment ta in begin
-      unify r_type (w_expr e environment);
+      sous_type (w_expr e environment) r_type;
       (add_var environment id r_type, Tnothing) end
   | Sconst (id, poly, ta, e) ->
     let new_env = add_poly environment poly in
     let ret_type = read_ta new_env ta in 
     let t = (w_expr e new_env) in (
-    unify ret_type t;
+    sous_type t ret_type;
     add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
     Tnothing)
 
@@ -322,23 +351,23 @@ and w_expr exp environment =
       | Tfun (targs, tret) -> begin
         try
         (
-          List.iter2 (fun x y -> unify x (w_expr y environment))
+          List.iter2 (fun x y -> sous_type (w_expr y environment) x)
               targs args;
           tret
         )
-        with |Invalid_argument _ -> raise
+        with | Invalid_argument _ -> raise
           (WrongArgsNumber ((List.length targs),(List.length args)))
         end
       | _ -> raise (NotCallable f_type) end
   | Ecases (ta, e, branches) ->
       let t = w_expr e environment in 
       let sub_type = Tvar (V.create ()) in begin
-      unify t (Tlist sub_type);
-      unify t (read_ta environment ta);
+      unify (read_ta environment ta) (Tlist sub_type);
+      sous_type t (Tlist sub_type);
       match branches with
       | (Branch1 ("empty", be))::(Branch2 ("link", [x;y], bl))::[]
       | (Branch2 ("link", [x;y], bl))::(Branch1 ("empty", be))::[] ->
-          let new_env = add_bind (add_bind environment x sub_type) y t in
+          let new_env = add_bind (add_bind environment x sub_type) y (Tlist sub_type) in
           let t_ret = w new_env bl in
           begin unify t_ret (w environment be);
           t_ret end
@@ -352,7 +381,7 @@ and w_expr exp environment =
       let start_types = List.fold_right (
         fun (id, t_a) l -> (read_ta environment t_a)::l
       ) params [] in
-      let r_type = w new_env b in 
-      (unify r_type (read_ta new_env ta); Tfun(start_types, r_type))
+      let r_type = (read_ta new_env ta) in
+      (sous_type (w new_env b) r_type ; Tfun(start_types, r_type))
 
 let typing s = w start_environment s
