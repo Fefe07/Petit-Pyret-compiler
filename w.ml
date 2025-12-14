@@ -300,14 +300,30 @@ and w_stmt environment stmt =
     let r_type = read_ta environment ta in begin
       sous_type (w_expr e environment) r_type;
       (add_var environment id r_type, Tnothing) end
-  | Sconst (id, poly, ta, e) ->
-    let new_env = add_poly environment poly in
-    let ret_type = read_ta new_env ta in 
-    let t = (w_expr e new_env) in (
-    sous_type t ret_type;
-    add_schema environment id {vars = Sset.of_list poly; typ = ret_type},
-    Tnothing)
+  | Sconst (id, ta, e) ->
+    let ret_type = read_ta environment ta in
+    (sous_type (w_expr e environment) ret_type;
+    (add_bind environment id ret_type, Tnothing))
 
+  | Sfun (id, poly, params, ta, e) -> 
+    let env_poly = add_poly environment poly in
+    let env_params = List.fold_left
+      (fun e (id,t_a) -> add_bind e id (read_ta env_poly t_a))
+      env_poly params in
+    let start_types = List.fold_right (
+      fun (id, t_a) l -> (read_ta env_poly t_a)::l
+    ) params [] in
+    let ret_type = read_ta env_poly ta in 
+    let new_env = add_schema env_params id {
+      vars = Sset.of_list poly;
+      typ = (Tfun (start_types, ret_type))
+    } in 
+    (sous_type (w new_env e) ret_type);
+    (add_schema environment id {
+      vars = Sset.of_list poly;
+      typ = (Tfun (start_types, ret_type))
+    },
+    Tnothing)
 
 and w_expr exp environment = 
   match exp with
