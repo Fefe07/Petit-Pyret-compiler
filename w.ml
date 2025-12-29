@@ -7,6 +7,7 @@ exception UnknownAnnotation of type_annotation
 exception WrongCase
 exception WrongArgsNumber of int * int
 exception VariableNotFound of string
+exception AffectationTypeError
 
 module V = struct 
   type t = tvar
@@ -90,23 +91,24 @@ module Smap = Map.Make(String)
 module Sset = Set.Make(String)
 
 type schema = { vars : Sset.t; typ : types }
+type variable = { env_vars : Sset.t; typ : types }
 
 
 type env = {
   bindings : schema Smap.t;
-  var_bindings : types Smap.t;
+  var_bindings : variable Smap.t;
   types : Sset.t;
   fvars : Vset.t }
 
 let rec bien_forme environment typ = 
-  (* Vérifie que toutes les types polymorphes sont bien définis ? *)
+  (* Vérifie que toutes les types polymorphes sont bien définis *)
   match head typ with
   | Tint | Tstr | Tboolean | Tany | Tnothing | Tintstr -> true
   | Tfun (x,y) -> List.for_all (bien_forme environment) x
     && bien_forme environment y
   | Tlist x -> bien_forme environment x
-  | Talpha x -> Sset.mem x environment.types
-  | Tvar _ -> false (* Je ne sais pas quoi faire ici *)
+  | Talpha x -> Sset.mem x environment
+  | Tvar _ -> true
 
 let start_environment = {
   bindings = Smap.of_list [
@@ -191,9 +193,10 @@ let add_var environment name typ =
   then raise (RedefinedVariable name)
   else
     let fvars = Vset.union environment.fvars (fvars typ) in
+    let v = { env_vars = environment.types; typ = typ } in
     {
       bindings = environment.bindings;
-      var_bindings = Smap.add name typ environment.var_bindings;
+      var_bindings = Smap.add name v environment.var_bindings;
       types = environment.types;
       fvars = fvars
     }
@@ -279,7 +282,7 @@ let rec read_ta environment ta =
       end
 
 let find e id = 
-  if Smap.mem id e.var_bindings then Smap.find id e.var_bindings
+  if Smap.mem id e.var_bindings then (Smap.find id e.var_bindings).typ
   else try
     let s = Smap.find id e.bindings in
     let rec fresh_type quant maps t = 
@@ -308,9 +311,12 @@ and w_stmt environment stmt =
   | Sexpr e -> (environment, w_expr e environment)
   | Saffect (id,e) -> (
     try
-      sous_type (w_expr e environment)
-        (Smap.find id environment.var_bindings);
-      (environment, Smap.find id environment.var_bindings)
+      let typexpr = (w_expr e environment) in 
+      let v = (Smap.find id environment.var_bindings) in
+      if not (bien_forme (v.env_vars) typexpr) then raise AffectationTypeError
+      else
+      (sous_type typexpr v.typ;
+      (environment, v.typ))
     with | Not_found -> raise (VariableNotFound id))
   | Svar (id, ta, e) ->
     let r_type = read_ta environment ta in begin
