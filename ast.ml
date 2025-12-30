@@ -37,6 +37,8 @@ type type_annotation =
 type cst = Cbool of bool | Cint of int | Cstr of string
 type param = ident * type_annotation
 
+type frame_size = int
+
 type stmt =
   | Sexpr of expr
   | Saffect of ident * expr
@@ -44,7 +46,15 @@ type stmt =
   | Sconst of ident * type_annotation * expr 
   | Sfun of ident * ident list * param list * type_annotation * block
 
+and astmt = 
+  | Aexpr of expr * frame_size
+  | Aaffect of ident * expr * frame_size
+  | Avar of ident * type_annotation * expr * frame_size
+  | Aconst of ident * type_annotation * expr * frame_size 
+  | Afun of ident * ident list * param list * type_annotation * block * frame_size
+
 and block = stmt list
+and ablock = astmt list
 
 and expr =
   | Bexpr of binop * expr * expr
@@ -56,16 +66,18 @@ and expr =
   | Ecases of type_annotation * expr * branch list
   | Eif of expr * expr * expr
 
-let aexpr = 
+and aexpr = 
   | ABexpr of binop * aexpr * aexpr
   | Acst of cst
   | Gvar of ident
-  | LVar of int
-  | Ablock of block
-  | Alam of funbody
+  | Lvar of int
+  | Ablock of ablock
+  | Alam of afunbody
   | Acall of aexpr * aexpr list
-  | Acases of type_annotation * aexpr * branch list
+  | Acases of type_annotation * aexpr * abranch list
   | Aif of aexpr * aexpr * aexpr
 
 and funbody = Funbody of param list * type_annotation * block
+and afunbody = Afunbody of param list * type_annotation * ablock
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
+and abranch = Branch1 of ident * ablock | Branch2 of ident * ident list * ablock

@@ -13,25 +13,78 @@ module Smap = Map.Make(String)
 
 type local_env = int Smap.t
 
-let rec alloc_expr (env: local_env) (fpcur: int) = function
-  | ECst c ->
-    ACst c, fpcur
+let extract_length (s : astmt) : frame_size =
+  match s with 
+  | Aexpr(_,i) -> i
+  | Aaffect(_,_,i) -> i
+  | Avar(_,_,_,i) -> i
+  | Aconst (_,_,_,i) -> i 
+  | Afun(_,_,_,_,_,i) -> i
+ 
 
-  | EVar x -> (match Smap.find_opt x env with
-    | Some i -> LVar i, fpcur
+let rec alloc_expr (env: local_env) (fpcur: int) = function
+  | Ecst c ->
+    Acst c, fpcur
+
+  | Evar x -> (match Smap.find_opt x env with
+    | Some i -> Lvar i, fpcur
     | None -> if not (Hashtbl.mem genv x) then raise (VarUndef x)
-        else GVar x, fpcur)
+        else Gvar x, fpcur)
 
   | Bexpr (o, e1, e2)->
     let exp1, s1 = alloc_expr env fpcur e1 in
     let exp2, s2 = alloc_expr env fpcur e2 in
     ABexpr (o, exp1, exp2), max s1 s2
 
-  | ECall (f, l) ->
+  | Ecall (f, l) ->
+    (* Créée un bug car f est une expression *)
+    (* TODO : comprendre Ecall *)
+    (* Comme les fonctions sont des valeurs de première classe,
+      elles peuvent être calculée/définies comme fonctions anonymes
+      avant d'être appelées*)
     let l, s = List.fold_right (fun e (le, s) -> 
-      let e', s' = alloc_expr env fpcur e in (e'::le, max s s'))
-      l ([],fpcur) in Acall (f,l) , s 
+      let e', s' = alloc_expr env fpcur e in (e'::le, max s s')
+    ) l ([],fpcur) in 
+    let f', i = alloc_expr env fpcur f in 
+    Acall (f',l), max i s 
 
+  | Eblock(instructions) -> 
+    (* let (i,l') = List.fold_left (fun (i, tl) e -> let e',j = alloc_expr env fpcur e in max i j, e' :: tl) (fpcur,[]) l in 
+    Ablock(l'),i *)
+    let code = alloc instructions in 
+    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
+    (Ablock(code),i' + fpcur)
+  
+  | Eif (e1, e2, e3) -> 
+    let e1', i1 = alloc_expr env fpcur e1 in
+    let e2', i2 = alloc_expr env fpcur e2 in
+    let e3', i3 = alloc_expr env fpcur e3 in
+    Aif(e1', e2', e3'), max (max i1 i2) i3 
+    
+  | Ecases(t, e, l) -> begin 
+    (* Si la liste a passé le parsing, 
+      alors elle est composée de deux éléments qui sont empty et list(x,y)*)
+    let e1,i1 = alloc_expr env fpcur e in 
+    match l with 
+    | (Branch1 ("empty", be))::(Branch2 ("link", [x;y], bl))::[]
+    | (Branch2 ("link", [x;y], bl))::(Branch1 ("empty", be))::[] ->
+      let ((Ablock b2),i2) = alloc_expr env fpcur (Eblock be) in 
+      let ((Ablock b3),i3) = alloc_expr env fpcur (Eblock  bl) in 
+      (* +16 : affectation des variables x et y *)
+      (Acases(t,e1,[Branch1 ("empty", b2); Branch2 ("link", [x;y], b3)]), 
+      max i1 (max i2 (i3 + 16)))
+    | _ -> assert false
+  end
+  | Elam (Funbody(l_args, typ_out, instructions)) ->
+    (* let (i,l') = List.fold_left (fun (i, tl) e -> 
+      let e',j = alloc_expr env fpcur e in max i j, e' :: tl
+    ) (fpcur,[]) l_args in  *)
+    let code = alloc instructions in 
+    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
+    (* max i (i' + fpcur) *)
+    (Alam(Afunbody(l_args, typ_out, code)),i' + fpcur)
+
+    
   | _ -> failwith "pas traité"
   (* 
 
@@ -43,7 +96,7 @@ let rec alloc_expr (env: local_env) (fpcur: int) = function
 
 
 
-let alloc_stmt = function
+and alloc_stmt = function
   | PSet (x, e) ->
     let e, s = alloc_expr Smap.empty 0 e in
     (Hashtbl.add genv x () ; Set (x, e, s))
@@ -57,7 +110,7 @@ let alloc_stmt = function
     let e, fpmax = alloc_expr Smap.empty 0 e in
     Print (e, fpmax)
 
-let alloc = List.map alloc_stmt
+and alloc = List.map alloc_stmt
 
 (******************************************************************************)
 (* phase 2 : production de code *)
