@@ -1,6 +1,7 @@
 open Format
 open Lexing
 open W
+open Compile
 
 (* TODO : formater ce fichier selon l'énoncé *)
 
@@ -63,8 +64,11 @@ let () =
 
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
-    let _ = W.typing p in 
-    if !type_only then exit 0
+    let typ = W.typing p in 
+    if !type_only then exit 0 ;
+    let ofile = open_out "compile_out" in
+    Compile.compile_program t ofile 
+  
   with
   | Lexer.Lexing_error c ->
       (* Erreur lexicale. On récupère sa position absolue et

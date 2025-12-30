@@ -301,7 +301,8 @@ let find e id =
     fresh_type s.vars (Hashtbl.create 16) s.typ
   with | Not_found -> raise (VariableNotFound id)
 
-let rec w environment stmts =
+let rec w (environment : env) (stmts : stmt list) : types =
+  (* Renvoie le type du dernier stmt, ou Tnothing si stmts est vide *)
   let (_, ret_type) = List.fold_left
     (fun (e,t) s -> w_stmt e s) (environment, Tnothing) stmts 
   in ret_type 
@@ -426,4 +427,4 @@ and w_expr exp environment =
       let r_type = (read_ta new_env ta) in
       (sous_type (w new_env b) r_type ; Tfun(start_types, r_type))
 
-let typing s = w start_environment s
+let typing (s : stmt list) : types = w start_environment s
