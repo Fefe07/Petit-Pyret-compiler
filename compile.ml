@@ -11,31 +11,36 @@ let (genv : (string, unit) Hashtbl.t) = Hashtbl.create 17
 
 module Smap = Map.Make(String)
 
-type local_env = ident Smap.t
+type local_env = int Smap.t
 
 let rec alloc_expr (env: local_env) (fpcur: int) = function
-  | PCst i ->
-    Cst i, fpcur
+  | ECst c ->
+    ACst c, fpcur
 
-  | PVar x -> (match Smap.find_opt x env with
+  | EVar x -> (match Smap.find_opt x env with
     | Some i -> LVar i, fpcur
     | None -> if not (Hashtbl.mem genv x) then raise (VarUndef x)
         else GVar x, fpcur)
 
-  | PBinop (o, e1, e2)->
+  | Bexpr (o, e1, e2)->
     let exp1, s1 = alloc_expr env fpcur e1 in
     let exp2, s2 = alloc_expr env fpcur e2 in
-    Binop (o, exp1, exp2), max s1 s2
+    ABexpr (o, exp1, exp2), max s1 s2
+
+  | ECall (f, l) ->
+    let l, s = List.fold_right (fun e (le, s) -> 
+      let e', s' = alloc_expr env fpcur e in (e'::le, max s s'))
+      l ([],fpcur) in Acall (f,l) , s 
+
+  | _ -> failwith "pas traité"
+  (* 
 
   | PLetin (x, e1, e2) ->
     let exp1, s1 = alloc_expr env fpcur e1 in 
     let exp2, s2 = alloc_expr (Smap.add x (-(fpcur + 8)) env) (fpcur+8) e2 in 
     Letin (-(fpcur + 8), exp1, exp2), max s1 s2
+*)
 
-  | PCall (f, l) ->
-    let l, s = List.fold_right (fun e (le, s) -> 
-      let e', s' = alloc_expr env fpcur e in (e'::le, max s s'))
-      l ([],fpcur) in Call (f,l) , s
 
 
 let alloc_stmt = function

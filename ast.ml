@@ -56,5 +56,16 @@ and expr =
   | Ecases of type_annotation * expr * branch list
   | Eif of expr * expr * expr
 
+let aexpr = 
+  | ABexpr of binop * aexpr * aexpr
+  | Acst of cst
+  | Gvar of ident
+  | LVar of int
+  | Ablock of block
+  | Alam of funbody
+  | Acall of aexpr * aexpr list
+  | Acases of type_annotation * aexpr * branch list
+  | Aif of aexpr * aexpr * aexpr
+
 and funbody = Funbody of param list * type_annotation * block
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block

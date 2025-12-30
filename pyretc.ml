@@ -66,8 +66,9 @@ let () =
     if !parse_only then exit 0;
     let typ = W.typing p in 
     if !type_only then exit 0 ;
+    (* Ouvre le fichier compile_out en écriture *)
     let ofile = open_out "compile_out" in
-    Compile.compile_program t ofile 
+    Compile.compile_program p ofile 
   
   with
   | Lexer.Lexing_error c ->
