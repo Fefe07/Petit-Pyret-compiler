@@ -97,9 +97,26 @@ let rec alloc_expr (env: local_env) (fpcur: int) = function
 
 
 and alloc_stmt = function
-  | PSet (x, e) ->
-    let e, s = alloc_expr Smap.empty 0 e in
-    (Hashtbl.add genv x () ; Set (x, e, s))
+  (* Il y a des blocks dans les expressions *)
+  (* -> Comment savoir si une variable est locale ou globale ? *)
+  (* Solutions : *)
+  (* - créer deux fonctions distinctes *)
+  (* - Traiter la table des variables globales comme un environnement local *)
+
+
+
+(* | Sexpr of expr
+| Saffect of ident * expr
+| Svar of ident * type_annotation * expr
+| Sconst of ident * type_annotation * expr 
+| Sfun of ident * ident list * param list * type_annotation * block
+
+ *)
+
+  | Saffect (x, e) ->
+  let e, s = alloc_expr Smap.empty 0 e in
+  (Hashtbl.add genv x () ; Set (x, e, s))
+  (* 
 
   | PFun (f, l, e) ->
     let new_env, _ = List.fold_left (fun (env,i) s -> (Smap.add s (8*i) env, i+1))
@@ -108,7 +125,7 @@ and alloc_stmt = function
 
   | PPrint e ->
     let e, fpmax = alloc_expr Smap.empty 0 e in
-    Print (e, fpmax)
+    Print (e, fpmax) *)
 
 and alloc = List.map alloc_stmt
 
@@ -119,7 +136,8 @@ let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
 
 let rec compile_expr = function
-  | Cst i ->
+  | Acst i ->
+    (* C'est quoi imm ? *)
       pushq (imm i)
 
   | LVar fp_x ->
