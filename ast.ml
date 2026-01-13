@@ -47,7 +47,7 @@ type stmt =
   | Sfun of ident * ident list * param list * type_annotation * block
 
 and astmt = 
-  | Aexpr of expr * frame_size
+  | Aexpr of aexpr * frame_size
   | Aaffect of ident * expr * frame_size
   | Avar of ident * type_annotation * expr * frame_size
   | Aconst of ident * type_annotation * expr * frame_size 
@@ -67,15 +67,15 @@ and expr =
   | Eif of expr * expr * expr
 
 and aexpr = 
-  | ABexpr of binop * aexpr * aexpr
+  | Abexpr of binop * aexpr * aexpr
   | Acst of cst
-  | Gvar of ident
-  | Lvar of int
+  | Aident of int
   | Ablock of ablock
   | Alam of afunbody
   | Acall of aexpr * aexpr list
   | Acases of type_annotation * aexpr * abranch list
   | Aif of aexpr * aexpr * aexpr
+  | Aprint of aexpr
 
 and funbody = Funbody of param list * type_annotation * block
 and afunbody = Afunbody of param list * type_annotation * ablock
