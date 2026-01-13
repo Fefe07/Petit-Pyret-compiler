@@ -57,6 +57,10 @@ let rec compile_expr = function
       match b with
       | Badd -> addq !%rdx !%rax
       | Bsub -> subq !%rdx !%rax
+      | Bmul -> imulq !%rdx !%rax
+      | Band -> andq !%rdx !%rax
+      | Bor -> orq !%rdx !%rax
+
     end
   | Aprint i ->
       compile_expr i ++ 
