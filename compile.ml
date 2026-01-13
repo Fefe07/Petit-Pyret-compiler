@@ -13,6 +13,12 @@ module Smap = Map.Make(String)
 
 type local_env = int Smap.t
 
+let counter = ref 20
+
+let new_label () = 
+  counter := !counter + 1 ;
+  "l" ^ (string_of_int !counter)
+
 let rec alloc_expr (env: local_env) (fpcur: int) = function 
   | Ecst i -> Acst i, fpcur
   | Evar id -> (
@@ -54,9 +60,27 @@ let rec compile_expr = function
       compile_expr e2 ++
       movq !%rax !%rdx ++
       popq rax ++
-      match b with
-      | Badd -> addq !%rdx !%rax
-      | Bsub -> subq !%rdx !%rax
+      begin 
+        match b with
+        | Badd -> addq !%rdx !%rax
+        | Bsub -> subq !%rdx !%rax
+        | Beq
+        | Bneq
+        | Blt
+        | Ble
+        | Bgt
+        | Bge -> 
+          let l = new_label()  in
+        let l2 = new_label() in
+          cmpq !%rdx !%rax
+        ++ (match ) l
+        ++ movq (imm 1) !%rax
+        ++ jmp l2
+        ++ label l
+        ++ movq (imm 0) !%rax
+        ++ label l2
+      end
+
     end
   | Aprint i ->
       compile_expr i ++ 
@@ -66,6 +90,8 @@ let rec compile_expr = function
       movq (imm 0) !%rax ++
       call "printf" ++
       movq !%r12 !%rax
+
+  | _ -> failwith "non traité"
 
 and compile_stmt = function 
   | Aexpr (e, _) -> compile_expr e
