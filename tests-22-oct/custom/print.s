@@ -2,8 +2,6 @@
 	.globl	main
 main:
 	movq %rsp, %rbp
-	movq $1, %rax
-	movq %rax, %rdx
 	movq $4, %rax
 	movq %rax, %rsi
 	movq %rax, %r12
@@ -11,6 +9,27 @@ main:
 	movq $0, %rax
 	call printf
 	movq %r12, %rax
+	pushq %rax
+	movq $7, %rax
+	pushq %rax
+	movq $1, %rax
+	movq %rax, %rsi
+	movq %rax, %r12
+	movq $.Sprint_int, %rdi
+	movq $0, %rax
+	call printf
+	movq %r12, %rax
+	movq %rax, %rdx
+	popq %rax
+	addq %rdx, %rax
+	movq %rax, %rsi
+	movq %rax, %r12
+	movq $.Sprint_int, %rdi
+	movq $0, %rax
+	call printf
+	movq %r12, %rax
+	movq %rax, %rdx
+	popq %rax
 	subq %rdx, %rax
 	movq %rax, %rsi
 	movq %rax, %r12

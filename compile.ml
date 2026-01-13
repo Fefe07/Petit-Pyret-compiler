@@ -21,7 +21,7 @@ let rec alloc_expr (env: local_env) (fpcur: int) = function
     with | Not_found -> raise (VarUndef id))
   | Bexpr (b, e1, e2) -> 
     let exp1, s1 = alloc_expr env fpcur e1 in
-    let exp2, s2 = alloc_expr env fpcur e2 in
+    let exp2, s2 = alloc_expr env (fpcur + 1) e2 in
     Abexpr (b, exp1, exp2), fpcur
   | Ecall (expr, [args]) when expr = Evar "print" -> Aprint (fst (alloc_expr env fpcur args)), 0
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
@@ -50,8 +50,10 @@ let rec compile_expr = function
     | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax)
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
-      movq !%rax !%rdx ++
+      pushq !%rax ++
       compile_expr e2 ++
+      movq !%rax !%rdx ++
+      popq rax ++
       match b with
       | Badd -> addq !%rdx !%rax
       | Bsub -> subq !%rdx !%rax
