@@ -1,6 +1,6 @@
 all: pyretc.exe
 
-pyretc.exe: lexer.mll parser.mly pyretc.ml w.ml
+pyretc.exe: lexer.mll parser.mly pyretc.ml w.ml compile.ml
 	dune build
 
 

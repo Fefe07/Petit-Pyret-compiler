@@ -67,7 +67,7 @@ let () =
     let typ = W.typing p in 
     if !type_only then exit 0 ;
     (* Ouvre le fichier compile_out en écriture *)
-    let ofile = open_out "compile_out" in
+    let ofile = Filename.chop_suffix !ifile ".arr" ^ ".s" in
     Compile.compile_program p ofile 
   
   with

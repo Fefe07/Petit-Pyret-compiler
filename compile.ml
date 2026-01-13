@@ -13,6 +13,106 @@ module Smap = Map.Make(String)
 
 type local_env = int Smap.t
 
+let rec alloc_expr (env: local_env) (fpcur: int) = function 
+  | Ecst i -> Acst i, fpcur
+  | Evar id -> (
+    try 
+      Aident (Smap.find id env), fpcur
+    with | Not_found -> raise (VarUndef id))
+  | Bexpr (b, e1, e2) -> 
+    let exp1, s1 = alloc_expr env fpcur e1 in
+    let exp2, s2 = alloc_expr env fpcur e2 in
+    Abexpr (b, exp1, exp2), fpcur
+  | Ecall (expr, [args]) when expr = Evar "print" -> Aprint (fst (alloc_expr env fpcur args)), 0
+  (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
+      List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
+  *)
+and alloc_stmt (env: local_env) (fpcur: int) = function 
+  | Sexpr e -> let new_expr, fpcur = alloc_expr env fpcur e in
+    (Aexpr (new_expr,0), fpcur), env
+
+and alloc_block instructions (env: local_env) (fpcur: int) = 
+    let statements, fpcur, _ =
+      List.fold_left (
+      fun (stmts, fpcur, env) stmt ->
+        let (new_stmt, new_fpcur), new_env = (alloc_stmt env fpcur stmt) in 
+        new_stmt::stmts, new_fpcur, new_env) ([], fpcur, env) instructions
+    in (List.rev statements), fpcur
+
+
+let popn n = addq (imm n) !%rsp
+let pushn n = subq (imm n) !%rsp
+
+let rec compile_expr = function 
+  | Acst c ->
+    (match c with 
+    | Cint i -> movq (imm i) !%rax
+    | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax)
+  | Abexpr (b, e1, e2) -> begin
+      compile_expr e1 ++
+      movq !%rax !%rdx ++
+      compile_expr e2 ++
+      match b with
+      | Badd -> addq !%rdx !%rax
+      | Bsub -> subq !%rdx !%rax
+    end
+  | Aprint i ->
+      compile_expr i ++ 
+      movq !%rax !%rsi ++ 
+      movq !%rax !%r12 ++
+      movq (ilab ".Sprint_int") !%rdi ++
+      movq (imm 0) !%rax ++
+      call "printf" ++
+      movq !%r12 !%rax
+
+and compile_stmt = function 
+  | Aexpr (e, _) -> compile_expr e
+
+and compile_block instructions = 
+  List.fold_left (fun code stmt -> code ++ (compile_stmt stmt)) nop instructions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*
+
 let extract_length (s : astmt) : frame_size =
   match s with 
   | Aexpr(_,i) -> i
@@ -184,25 +284,18 @@ let compile_stmt (codefun, codemain) = function
       call "print_int"
     in
     codefun, codemain ++ code
-
+*)
 let compile_program p ofile =
-  let p = alloc p in
-  Format.eprintf "%a@." print p;
-  let codefun, code = List.fold_left compile_stmt (nop, nop) p in
+  let start_env = Smap.empty in
+  let p, _ = alloc_block p start_env 0 in
+  let code = List.fold_left (fun c s -> c ++ compile_stmt s) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++
         movq !%rsp !%rbp ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
-        ret ++
-        label "print_int" ++
-        movq !%rdi !%rsi ++
-        movq (ilab ".Sprint_int") !%rdi ++
-        movq (imm 0) !%rax ++
-        call "printf" ++
-        ret ++
-        codefun;
+        ret;
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
           (label ".Sprint_int" ++ string "%d\n")
