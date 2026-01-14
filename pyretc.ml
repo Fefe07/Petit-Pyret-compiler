@@ -64,11 +64,11 @@ let () =
 
     (* On s'arrête ici si on ne veut faire que le parsing *)
     if !parse_only then exit 0;
-    let typ = W.typing p in 
+    let _, new_ast = W.typing p in 
     if !type_only then exit 0 ;
     (* Ouvre le fichier compile_out en écriture *)
     let ofile = Filename.chop_suffix !ifile ".arr" ^ ".s" in
-    Compile.compile_program p ofile 
+    Compile.compile_program new_ast ofile 
   
   with
   | Lexer.Lexing_error c ->

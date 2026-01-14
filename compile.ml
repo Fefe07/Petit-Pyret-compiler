@@ -109,7 +109,7 @@ and compile_stmt = function
   | _ -> failwith "compile_stmt - cas non traité"
 
 and compile_block instructions = 
-  List.fold_left (fun c s -> compile_stmt s ++ c ) nop instructions
+  List.fold_left (fun c s -> c ++ compile_stmt s ) nop instructions
 
 
 
