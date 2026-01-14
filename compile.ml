@@ -94,7 +94,10 @@ let rec compile_expr = function
         | Bmul -> imulq !%rdx !%rax
         | Band -> andq !%rdx !%rax
         | Bor -> orq !%rdx !%rax
-        | Bdiv -> idivq !%rdx (* Si j'ai bien comprus ça marche *)
+        | Bdiv -> movq !%rdx !%rbx ++
+        movq (imm 0) !%rdx ++
+        idivq !%rbx 
+        (* Si j'ai bien compris ça marche *)
         (* | _ -> failwith "pas traité" *)
         end
     end
