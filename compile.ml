@@ -99,6 +99,7 @@ let rec compile_expr = function
         idivq !%rbx 
         (* Si j'ai bien compris ça marche *)
         (* | _ -> failwith "pas traité" *)
+        | Baddstr -> failwith "pas traité" 
         end
     end
   | Aprint i ->
@@ -361,6 +362,15 @@ let compile_program p ofile =
         movq !%rsp !%rbp ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
+        ret ++
+        label "my_malloc" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
+        (*movq (ind ~ofs:24 rbp) !%rdi ++*)
+        call "malloc" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++ 
         ret;
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
