@@ -33,9 +33,13 @@ let rec alloc_expr (env: local_env) (fpcur: int) = function
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
+  | _ -> failwith "alloc_expr - cas non traité"
+
 and alloc_stmt (env: local_env) (fpcur: int) = function 
   | Sexpr e -> let new_expr, fpcur = alloc_expr env fpcur e in
     (Aexpr (new_expr,0), fpcur), env
+
+  | _ -> failwith "alloc_stmt - cas non traité"
 
 and alloc_block instructions (env: local_env) (fpcur: int) = 
     let statements, fpcur, _ =
@@ -53,7 +57,8 @@ let rec compile_expr = function
   | Acst c ->
     (match c with 
     | Cint i -> movq (imm i) !%rax
-    | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax)
+    | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax
+    | Cstr _ -> failwith "compile_expr - strings non traitées") 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
       pushq !%rax ++
@@ -90,7 +95,7 @@ let rec compile_expr = function
         | Band -> andq !%rdx !%rax
         | Bor -> orq !%rdx !%rax
         | Bdiv -> idivq !%rdx (* Si j'ai bien comprus ça marche *)
-        | _ -> failwith "pas traité"
+        (* | _ -> failwith "pas traité" *)
         end
     end
   | Aprint i ->
@@ -109,7 +114,7 @@ and compile_stmt = function
   | _ -> failwith "compile_stmt - cas non traité"
 
 and compile_block instructions = 
-  List.fold_left (fun c s -> compile_stmt s ++ c ) nop instructions
+  List.fold_left (fun c s -> c ++ compile_stmt s) nop instructions
 
 
 
@@ -346,7 +351,7 @@ let compile_stmt (codefun, codemain) = function
 let compile_program p ofile =
   let start_env = Smap.empty in
   let p, _ = alloc_block p start_env 0 in
-  let code = List.fold_left (fun c s -> compile_stmt s ++ c ) nop p in
+  let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++
