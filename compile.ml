@@ -73,7 +73,14 @@ let rec compile_expr = function
           let l = new_label()  in
         let l2 = new_label() in
           cmpq !%rdx !%rax
-        ++ (match ) l
+        ++ 
+        (match b with 
+        | Beq -> jne 
+        | Bneq -> je 
+        | Blt -> jge
+        | Ble -> jgt
+        | Bgt -> jle
+        | Bge -> jlt ) l
         ++ movq (imm 1) !%rax
         ++ jmp l2
         ++ label l
