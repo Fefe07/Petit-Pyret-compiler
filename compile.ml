@@ -63,19 +63,23 @@ let pushn n = subq (imm n) !%rsp
 let rec compile_expr = function 
   | Acst c ->
     (match c with 
-    | Cint i -> movq (imm i) !%rax
+    | Cint i ->
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 2) !%rdi ++
+        movq !%rdi (ind rax) ++
+        movq (imm i) !%rdi ++
+        movq !%rdi (ind ~ofs:8 rax)
     | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax
     | Cstr _ -> failwith "compile_expr - strings non traitées") 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
-      pushq !%rax ++
+      pushq (ind ~ofs:8 rax) ++
       compile_expr e2 ++
-      movq !%rax !%rdx ++
+      movq (ind ~ofs:8 rax) !%rdx ++
       popq rax ++
       begin 
         match b with
-        | Badd -> addq !%rdx !%rax
-        | Bsub -> subq !%rdx !%rax
         | Beq
         | Bneq
         | Blt
@@ -99,24 +103,39 @@ let rec compile_expr = function
           ++ label l
           ++ movq (imm 0) !%rax
           ++ label l2
-        | Bmul -> imulq !%rdx !%rax
         | Band -> andq !%rdx !%rax
         | Bor -> orq !%rdx !%rax
-        | Bdiv -> movq !%rdx !%rbx ++
-        movq (imm 0) !%rdx ++
-        idivq !%rbx 
-        (* Si j'ai bien compris ça marche *)
+        | Badd | Bsub | Bmul | Bdiv -> 
+            (match b with 
+            | Badd -> addq !%rdx !%rax
+            | Bsub -> subq !%rdx !%rax
+            | Bmul -> imulq !%rdx !%rax
+            | Bdiv -> movq !%rdx !%rbx ++
+                movq (imm 0) !%rdx ++
+                idivq !%rbx 
+                (* Si j'ai bien compris ça marche *)
+            | _ -> assert false
+            ) ++
+          pushq !%rax ++
+          movq (imm 16) !%rdi ++
+          call "my_malloc" ++
+          movq (imm 2) !%rdi ++
+          movq !%rdi (ind rax) ++
+          popq rdi ++
+          movq !%rdi (ind ~ofs:8 rax)
+
         (* | _ -> failwith "pas traité" *)
+        | Baddstr -> failwith "pas traité" 
         end
     end
   | Aprint i ->
       compile_expr i ++ 
-      movq !%rax !%rsi ++ 
-      movq !%rax !%r12 ++
+      movq (ind ~ofs:8 rax) !%rsi ++ 
+      pushq !%rax ++
       movq (ilab ".Sprint_int") !%rdi ++
       movq (imm 0) !%rax ++
       call "printf" ++
-      movq !%r12 !%rax
+      popq rax
 
   | Aif(e1,e2,e3) -> 
     (* TODO : À modifier avec le nouveau type de données *)
@@ -380,6 +399,15 @@ let compile_program p ofile =
         movq !%rsp !%rbp ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
+        ret ++
+        label "my_malloc" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
+        (*movq (ind ~ofs:24 rbp) !%rdi ++*)
+        call "malloc" ++
+        movq !%rbp !%rsp ++
+        popq rbp ++ 
         ret;
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
