@@ -71,25 +71,25 @@ let rec compile_expr = function
         | Bgt
         | Bge -> 
           let l = new_label()  in
-        let l2 = new_label() in
-          cmpq !%rdx !%rax
-        ++ 
-        (match b with 
-        | Beq -> jne 
-        | Bneq -> je 
-        | Blt -> jge
-        | Ble -> jg
-        | Bgt -> jle
-        | Bge -> jl ) l
-        ++ movq (imm 1) !%rax
-        ++ jmp l2
-        ++ label l
-        ++ movq (imm 0) !%rax
-        ++ label l2
-      
+          let l2 = new_label() in
+          cmpq !%rdx !%rax ++ 
+          (match b with 
+          | Beq -> jne 
+          | Bneq -> je 
+          | Blt -> jge
+          | Ble -> jg
+          | Bgt -> jle
+          | Bge -> jl 
+          | _ -> assert(false)) l
+          ++ movq (imm 1) !%rax
+          ++ jmp l2
+          ++ label l
+          ++ movq (imm 0) !%rax
+          ++ label l2
         | Bmul -> imulq !%rdx !%rax
         | Band -> andq !%rdx !%rax
         | Bor -> orq !%rdx !%rax
+        | Bdiv -> idivq !%rdx (* Si j'ai bien comprus ça marche *)
         | _ -> failwith "pas traité"
         end
     end
@@ -102,13 +102,14 @@ let rec compile_expr = function
       call "printf" ++
       movq !%r12 !%rax
 
-  | _ -> failwith "non traité"
+  | _ -> failwith "compile_expr - cas non traité"
 
 and compile_stmt = function 
   | Aexpr (e, _) -> compile_expr e
+  | _ -> failwith "compile_stmt - cas non traité"
 
 and compile_block instructions = 
-  List.fold_left (fun code stmt -> code ++ (compile_stmt stmt)) nop instructions
+  List.fold_left (fun c s -> compile_stmt s ++ c ) nop instructions
 
 
 
@@ -345,7 +346,7 @@ let compile_stmt (codefun, codemain) = function
 let compile_program p ofile =
   let start_env = Smap.empty in
   let p, _ = alloc_block p start_env 0 in
-  let code = List.fold_left (fun c s -> c ++ compile_stmt s) nop p in
+  let code = List.fold_left (fun c s -> compile_stmt s ++ c ) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++

@@ -8,7 +8,25 @@ main:
 	movq %rax, %rdx
 	popq %rax
 	cmpq %rdx, %rax
-	je l21
+	je l23
+	movq $1, %rax
+	jmp l24
+l23:
+	movq $0, %rax
+l24:
+	movq %rax, %rsi
+	movq %rax, %r12
+	movq $.Sprint_int, %rdi
+	movq $0, %rax
+	call printf
+	movq %r12, %rax
+	movq $42, %rax
+	pushq %rax
+	movq $69, %rax
+	movq %rax, %rdx
+	popq %rax
+	cmpq %rdx, %rax
+	jne l21
 	movq $1, %rax
 	jmp l22
 l21:
