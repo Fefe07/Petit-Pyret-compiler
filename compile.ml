@@ -19,7 +19,9 @@ let new_label () =
   counter := !counter + 1 ;
   "l" ^ (string_of_int !counter)
 
-let rec alloc_expr (env: local_env) (fpcur: int) = function 
+let rec alloc_expr (env: local_env) (fpcur: int) e = 
+  print_expr e ;
+  match e with 
   | Ecst i -> Acst i, fpcur
   | Evar id -> (
     try 
@@ -33,7 +35,12 @@ let rec alloc_expr (env: local_env) (fpcur: int) = function
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
-  | _ -> failwith "alloc_expr - cas non traité"
+  | Eif (e1, e2, e3) -> 
+    let e1', i1 = alloc_expr env fpcur e1 in
+    let e2', i2 = alloc_expr env fpcur e2 in
+    let e3', i3 = alloc_expr env fpcur e3 in
+    Aif(e1', e2', e3'), max (max i1 i2) i3 
+  | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) (fpcur: int) = function 
   | Sexpr e -> let new_expr, fpcur = alloc_expr env fpcur e in
@@ -86,6 +93,7 @@ let rec compile_expr = function
           | Bgt -> jle
           | Bge -> jl 
           | _ -> assert(false)) l
+              (* TODO : À modifier avec le nouveau type de données *)
           ++ movq (imm 1) !%rax
           ++ jmp l2
           ++ label l
@@ -109,6 +117,17 @@ let rec compile_expr = function
       movq (imm 0) !%rax ++
       call "printf" ++
       movq !%r12 !%rax
+
+  | Aif(e1,e2,e3) -> 
+    (* TODO : À modifier avec le nouveau type de données *)
+    compile_expr e1 ++ 
+    cmpq (imm 0) !%rax ++
+    jne "1f" ++
+    compile_expr e3 ++
+    jmp "2f" ++
+    label "1" ++
+    compile_expr e2 ++ 
+    label "2"
 
   | _ -> failwith "compile_expr - cas non traité"
 

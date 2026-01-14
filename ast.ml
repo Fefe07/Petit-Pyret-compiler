@@ -82,3 +82,22 @@ and funbody = Funbody of param list * type_annotation * block
 and afunbody = Afunbody of param list * type_annotation * ablock
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
 and abranch = Branch1 of ident * ablock | Branch2 of ident * ident list * ablock
+
+
+let rec print_expr = function 
+  | Eif(e1,e2,e3) -> 
+    (print_string "Eif\nConsition :\n" ; 
+    print_expr e1 ;
+    print_string "Si :\n" ; 
+    print_expr e2 ;
+    print_string "Sinon :\n" ; 
+    print_expr e3)
+  | Bexpr (_,e1,e2) -> (print_string "Binop\n"; print_expr e1; print_expr e2)
+  | Ecall (e, l) -> print_string "Appel" ; print_expr e ; List.iter print_expr l 
+  | Ecst c -> begin 
+    match c with 
+    | Cstr s -> print_string s 
+    | Cint i -> print_int i 
+    | Cbool b -> if b then print_string "true" else print_string "false"
+  end
+  | _ -> print_string "Autre\n"
