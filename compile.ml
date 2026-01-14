@@ -20,7 +20,6 @@ let new_label () =
   "l" ^ (string_of_int !counter)
 
 let rec alloc_expr (env: local_env) (fpcur: int) e = 
-  print_expr e ;
   match e with 
   | Ecst i -> Acst i, fpcur
   | Evar id -> (
@@ -474,10 +473,10 @@ let compile_program p ofile =
         ret;
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
-          (label ".Sprint_int" ++ string "%d\n" ++
-          label ".Sprint_str" ++ string "%s\n" ++
-          label ".true" ++ string "true\n" ++
-          label ".false" ++ string "false\n")
+          (label ".Sprint_int" ++ string "%d" ++
+          label ".Sprint_str" ++ string "%s" ++
+          label ".true" ++ string "true" ++
+          label ".false" ++ string "false")
     }
   in
   let f = open_out ofile in
