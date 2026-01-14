@@ -70,8 +70,22 @@ let rec compile_expr = function
         movq !%rdi (ind rax) ++
         movq (imm i) !%rdi ++
         movq !%rdi (ind ~ofs:8 rax)
-    | Cbool i -> if i then movq (imm 1) !%rax else movq (imm 0) !%rax
-    | Cstr _ -> failwith "compile_expr - strings non traitées") 
+    | Cbool i ->
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 1) !%rdi ++
+        movq !%rdi (ind rax) ++
+        if i then movq (imm 1) !%rdi else movq (imm 0) !%rdi ++
+        movq !%rdi (ind ~ofs:8 rax)
+    | Cstr s ->
+        let n = String.length s in
+        movq (imm (8 + n + 1)) !%rdi ++
+        call "my_malloc" ++
+        fst (String.fold_left (fun (ins,i) c ->
+          ins ++ movb (imm (Char.code c)) (ind ~ofs:i rax), i+1)
+          (movq (imm 3) (ind rax), 8) s) ++
+        movb (imm 0) (ind ~ofs:(8+n) rax))
+
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
       pushq (ind ~ofs:8 rax) ++
@@ -80,31 +94,43 @@ let rec compile_expr = function
       popq rax ++
       begin 
         match b with
-        | Beq
-        | Bneq
-        | Blt
-        | Ble
-        | Bgt
-        | Bge -> 
-          let l = new_label()  in
-          let l2 = new_label() in
-          cmpq !%rdx !%rax ++ 
-          (match b with 
-          | Beq -> jne 
-          | Bneq -> je 
-          | Blt -> jge
-          | Ble -> jg
-          | Bgt -> jle
-          | Bge -> jl 
-          | _ -> assert(false)) l
-              (* TODO : À modifier avec le nouveau type de données *)
-          ++ movq (imm 1) !%rax
-          ++ jmp l2
-          ++ label l
-          ++ movq (imm 0) !%rax
-          ++ label l2
-        | Band -> andq !%rdx !%rax
-        | Bor -> orq !%rdx !%rax
+        | Beq | Bneq | Blt | Ble | Bgt | Bge | Band | Bor -> 
+            (match b with 
+            | Beq
+            | Bneq
+            | Blt
+            | Ble
+            | Bgt
+            | Bge -> 
+              (*TODO: ne pas vérifier uniquement la valeur pour l'égalité, mais aussi le type*)
+              let l = new_label()  in
+              let l2 = new_label() in
+              cmpq !%rdx !%rax ++ 
+              (match b with 
+              | Beq -> jne 
+              | Bneq -> je 
+              | Blt -> jge
+              | Ble -> jg
+              | Bgt -> jle
+              | Bge -> jl 
+              | _ -> assert(false)) l
+              ++ movq (imm 1) !%rax
+              ++ jmp l2
+              ++ label l
+              ++ movq (imm 0) !%rax
+              ++ label l2
+            | Band -> andq !%rdx !%rax
+            | Bor -> orq !%rdx !%rax
+            | _ -> assert false
+            ) ++ 
+            pushq !%rax ++
+            movq (imm 16) !%rdi ++
+            call "my_malloc" ++
+            movq (imm 1) !%rdi ++
+            movq !%rdi (ind rax) ++
+            popq rdi ++
+            movq !%rdi (ind ~ofs:8 rax)
+            
         | Badd | Bsub | Bmul | Bdiv -> 
             (match b with 
             | Badd -> addq !%rdx !%rax
@@ -129,13 +155,9 @@ let rec compile_expr = function
         end
     end
   | Aprint i ->
-      compile_expr i ++ 
-      movq (ind ~ofs:8 rax) !%rsi ++ 
-      pushq !%rax ++
-      movq (ilab ".Sprint_int") !%rdi ++
-      movq (imm 0) !%rax ++
-      call "printf" ++
-      popq rax
+      compile_expr i ++
+      movq !%rax !%rdi ++
+      call "print"
 
   | Aif(e1,e2,e3) -> 
     (* TODO : À modifier avec le nouveau type de données *)
@@ -408,10 +430,54 @@ let compile_program p ofile =
         call "malloc" ++
         movq !%rbp !%rsp ++
         popq rbp ++ 
+        ret ++
+        label "print" ++
+        pushq !%rbp ++
+        pushq !%rdi ++
+        movq !%rsp !%rbp ++
+        andq (imm (-16)) !%rsp ++
+        cmpq (imm 1) (ind rdi) ++
+        je "1f" ++
+        cmpq (imm 2) (ind rdi) ++
+        je "2f" ++
+        cmpq (imm 3) (ind rdi) ++
+        je "3f" ++
+        jmp "7f" ++
+        label "1" ++
+        cmpq (imm 1) (ind ~ofs:8 rdi) ++
+        je "print_true" ++
+        movq (ilab ".false") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        jmp "7f" ++
+        label "print_true" ++
+        movq (ilab ".true") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        jmp "7f" ++
+        label "2" ++
+        movq (ind ~ofs:8 rdi) !%rsi ++
+        movq (ilab ".Sprint_int") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        jmp "7f" ++
+        label "3" ++
+        addq (imm 8) !%rdi ++
+        movq !%rdi !%rsi ++
+        movq (ilab ".Sprint_str") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        jmp "7f" ++
+        label "7" ++
+        popq rax ++
+        popq rbp ++
         ret;
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
-          (label ".Sprint_int" ++ string "%d\n")
+          (label ".Sprint_int" ++ string "%d\n" ++
+          label ".Sprint_str" ++ string "%s\n" ++
+          label ".true" ++ string "true\n" ++
+          label ".false" ++ string "false\n")
     }
   in
   let f = open_out ofile in
