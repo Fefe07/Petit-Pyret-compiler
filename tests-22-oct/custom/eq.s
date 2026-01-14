@@ -8,7 +8,7 @@ main:
 	movq %rax, %rdx
 	popq %rax
 	cmpq %rdx, %rax
-	jne l21
+	je l21
 	movq $1, %rax
 	jmp l22
 l21:

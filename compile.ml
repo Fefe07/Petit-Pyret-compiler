@@ -60,7 +60,6 @@ let rec compile_expr = function
       compile_expr e2 ++
       movq !%rax !%rdx ++
       popq rax ++
-<<<<<<< HEAD
       begin 
         match b with
         | Badd -> addq !%rdx !%rax
@@ -79,9 +78,9 @@ let rec compile_expr = function
         | Beq -> jne 
         | Bneq -> je 
         | Blt -> jge
-        | Ble -> jgt
+        | Ble -> jg
         | Bgt -> jle
-        | Bge -> jlt ) l
+        | Bge -> jl ) l
         ++ movq (imm 1) !%rax
         ++ jmp l2
         ++ label l
@@ -91,15 +90,8 @@ let rec compile_expr = function
         | Bmul -> imulq !%rdx !%rax
         | Band -> andq !%rdx !%rax
         | Bor -> orq !%rdx !%rax
-=======
-      match b with
-      | Badd -> addq !%rdx !%rax
-      | Bsub -> subq !%rdx !%rax
-      | Bmul -> imulq !%rdx !%rax
-      | Band -> andq !%rdx !%rax
-      | Bor -> orq !%rdx !%rax
->>>>>>> d128ead3735a4ac6cd7ea85a236b561b59474932
-
+        | _ -> failwith "pas traité"
+        end
     end
   | Aprint i ->
       compile_expr i ++ 
