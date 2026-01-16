@@ -583,14 +583,20 @@ let compile_stmt (codefun, codemain) = function
     codefun, codemain ++ code
 *)
 let compile_program p ofile =
-  let start_env = Smap.empty in
-  let p, _ = alloc_block p start_env 1 in
+  let start_env = Smap.singleton "num-modulo" 1 in
+  let p, _ = alloc_block p start_env 2 in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++
         pushq !%rbp ++
         movq !%rsp !%rbp ++
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "num_modulo") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
         movq !%rbp !%rsp ++
@@ -655,7 +661,7 @@ let compile_program p ofile =
         movq (ind ~ofs:8 rsi) !%rdx ++
         label "1" ++
         cmpq !%rax !%rdx ++
-        jl "1f" ++
+        jg "1f" ++
         subq !%rdx !%rax ++
         jmp "1b" ++
         label "1" ++
