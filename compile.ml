@@ -592,13 +592,23 @@ let compile_program p ofile =
         globl "main" ++ label "main" ++
         pushq !%rbp ++
         movq !%rsp !%rbp ++
+      (* On alloue num_modulo *)
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
         movq (imm 6) (ind rax) ++
         leaq (lab "num_modulo") rdx ++
         movq !%rdx (ind ~ofs:8 rax) ++
         pushq !%rax ++
+      (* On alloue nothing *)
+        movq (imm 8) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 0) (ind rax) ++
+        pushq !%rax ++
+
+      (* Le code compilé est rajouté ici *)
         code ++
+
+
         movq (imm 0) !%rax ++ (* exit *)
         movq !%rbp !%rsp ++
         popq rbp ++
