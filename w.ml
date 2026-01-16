@@ -417,7 +417,7 @@ and w_expr (exp:expr) (environment:env) : types*expr =
           tret, Ecall (f_expr,
           List.fold_left2 (fun ins x y ->
             let type1, expr1 = (w_expr y environment) in
-            (sous_type type1 x;expr1::ins))
+            (sous_type type1 x;ins@[expr1]))
             [] targs args)
         with | Invalid_argument _ -> raise
           (WrongArgsNumber ((List.length targs),(List.length args)))

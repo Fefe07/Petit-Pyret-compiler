@@ -583,15 +583,21 @@ let compile_stmt (codefun, codemain) = function
     codefun, codemain ++ code
 *)
 let compile_program p ofile =
-  let start_env = Smap.add "nothing" 0 Smap.empty in
-  let start_fpcur = 2 in (* 1 pour  et 1 pour nothing*)
-  let p, _ = alloc_block p start_env start_fpcur in 
+  let start_env = Smap.add "nothing" 2 (Smap.singleton "num-modulo" 1) in
+  let start_fpcur = 3 in (* 1 pour num_modulo et 2 pour nothing*)
+  let p, _ = alloc_block p start_env start_fpcur in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++
         pushq !%rbp ++
         movq !%rsp !%rbp ++
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "num_modulo") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
         movq !%rbp !%rsp ++
@@ -654,11 +660,26 @@ let compile_program p ofile =
         movq (ind ~ofs:8 rsi) !%rax ++
         movq (ind ~ofs:32 rbp) !%rsi ++
         movq (ind ~ofs:8 rsi) !%rdx ++
+        movq (imm 0) !%rsi ++
+        cmpq (imm 0) !%rdx ++
+        jg "1f" ++
+        movq (imm 1) !%rsi ++
+        negq !%rdx ++
+        negq !%rax ++
+        label "1" ++
+        cmpq (imm 0) !%rax ++
+        jg "1f" ++
+        addq !%rdx !%rax ++
+        jmp "1b" ++
         label "1" ++
         cmpq !%rax !%rdx ++
-        jl "1f" ++
+        jg "1f" ++
         subq !%rdx !%rax ++
         jmp "1b" ++
+        label "1" ++
+        cmpq (imm 0) !%rsi ++
+        je "1f" ++
+        negq !%rax ++
         label "1" ++
         pushq !%rax ++
         movq (imm 16) !%rdi ++
