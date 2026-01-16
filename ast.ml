@@ -46,13 +46,14 @@ type stmt =
   | Svar of ident * type_annotation * expr
   | Sconst of ident * type_annotation * expr 
   | Sfun of ident * ident list * param list * type_annotation * block
+  | Sfun2 of ident * ident list * block
 
 and astmt = 
   | Aexpr of aexpr * frame_size
   | Aaffect of int * aexpr * frame_size
-  | Avar of ident * type_annotation * aexpr * frame_size
-  | Aconst of ident * type_annotation * aexpr * frame_size 
-  | Afun of ident * ident list * param list * type_annotation * block * frame_size
+  | Avar of ident * aexpr * frame_size
+  | Aconst of ident * aexpr * frame_size 
+  | Afun of ident * ident list * ablock * frame_size
 
 and block = stmt list
 and ablock = astmt list

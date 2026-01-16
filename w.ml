@@ -352,7 +352,7 @@ and w_stmt (environment:env) (stmt: stmt) : env*types*stmt =
       vars = Sset.of_list poly;
       typ = (Tfun (start_types, ret_type))
     },
-    Tnothing, Sfun(id,poly,params,ta,instructions))
+    Tnothing, Sfun2(id,List.map fst params,instructions))
 
 and w_expr (exp:expr) (environment:env) : types*expr = 
   match exp with

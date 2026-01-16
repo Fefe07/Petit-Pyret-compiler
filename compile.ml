@@ -23,9 +23,9 @@ let extract_length (s : astmt) : frame_size =
   match s with 
   | Aexpr(_,i) -> i
   | Aaffect(_,_,i) -> i
-  | Avar(_,_,_,i) -> i
-  | Aconst (_,_,_,i) -> i 
-  | Afun(_,_,_,_,_,i) -> i
+  | Avar(_,_,i) -> i
+  | Aconst (_,_,i) -> i 
+  | Afun(_,_,_,i) -> i
   
 
 let rec alloc_expr (env: local_env) (fpcur: int) e = 
@@ -49,7 +49,7 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
     let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
     (Ablock(code),i' + fpcur)
     
-  | Ecall (expr, [args]) when expr = Evar "print" || expr = Ecst (Cstr "print") -> 
+  | Ecall (expr, [args]) when expr = Evar "print" -> 
     Aprint (fst (alloc_expr env fpcur args)), 0
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
@@ -80,11 +80,15 @@ and alloc_stmt (env: local_env) (fpcur: int) = function
       (Aexpr (new_expr,0), fpcur), env
   | Sconst (id, ta, e) | Svar (id,ta,e) -> 
       let new_expr, fpcur = alloc_expr env fpcur e in
-      (Aconst (id, ta, new_expr, fpcur), fpcur + 1), Smap.add id fpcur env
+      (Aconst (id, new_expr, fpcur), fpcur + 1), Smap.add id fpcur env
   | Saffect (id, e) -> 
       let new_expr, fpcur = alloc_expr env fpcur e in
       (Aaffect (Smap.find id env, new_expr, fpcur), fpcur), env
-
+  | Sfun2 (ident, args, ins) -> 
+      let new_env, _ = List.fold_left (fun (map, i) id -> 
+        (Smap.add id i map, i-1)) (Smap.empty, -3) args in
+      let new_expr, fpcur2 = alloc_block ins new_env fpcur in
+      (Afun(ident, args,new_expr, 0 ), fpcur + 1), Smap.add ident fpcur env
 
   | _ -> failwith "alloc_stmt - cas non traité"
 
@@ -295,17 +299,51 @@ let rec compile_expr = function
     label "2"
 
   | Ablock(b) -> compile_block b
+  | Acall (f, args) -> 
+      let code = ref (List.fold_left (fun c e -> 
+      compile_expr e ++
+      pushq !%rax ++ c) nop args ++
+      compile_expr f ++
+      pushq !%rax ++
+      call_star (ind ~ofs:8 rax))
+      in (
+        for i=0 to List.length args do 
+          code := !code ++ popq rdi
+        done; !code
+      )
+      
 
   | _ -> failwith "compile_expr - cas non traité"
 
 and compile_stmt = function 
   | Aexpr (e, _) -> compile_expr e
-  | Aconst (_, _, e, _) -> 
+  | Aconst (_, e, _) -> 
       compile_expr e ++
       pushq !%rax
   | Aaffect (i, e, _) -> 
       compile_expr e ++
+      (*TODO on doit pouvoir free ici*)
       movq !%rax (ind ~ofs:(-8*i) rbp)
+
+  | Afun (id, args, ins, _) -> 
+      let fin = new_label () in
+      let nom = new_label () in
+      jmp fin ++
+      label nom ++
+      pushq !%rbp ++
+      movq !%rsp !%rbp ++
+      compile_block ins ++
+      movq !%rbp !%rsp ++
+      popq rbp ++
+      ret ++
+      label fin ++
+      movq (imm 16) !%rdi ++
+      call "my_malloc" ++
+      movq (imm 6) (ind rax) ++
+      leaq (lab nom) rdx ++
+      movq !%rdx (ind ~ofs:8 rax) ++
+      pushq !%rax
+
   | _ -> failwith "compile_stmt - cas non traité"
 
 and compile_block instructions = 
@@ -607,7 +645,30 @@ let compile_program p ofile =
         label "7" ++
         popq rax ++
         popq rbp ++
+        ret ++
+        label "num_modulo" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        movq (ind ~ofs:24 rbp) !%rsi ++
+        movq (ind ~ofs:8 rsi) !%rax ++
+        movq (ind ~ofs:32 rbp) !%rsi ++
+        movq (ind ~ofs:8 rsi) !%rdx ++
+        label "1" ++
+        cmpq !%rax !%rdx ++
+        jl "1f" ++
+        subq !%rdx !%rax ++
+        jmp "1b" ++
+        label "1" ++
+        pushq !%rax ++
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        popq rdi ++
+        movq (imm 2) (ind rax) ++
+        movq !%rdi (ind ~ofs:8 rax) ++
+        popq rbp ++
         ret;
+
+        
       data =
         Hashtbl.fold (fun x _ l -> label x ++ dquad [1] ++ l) genv
           (label ".Sprint_int" ++ string "%d" ++
