@@ -72,18 +72,99 @@ let rec compile_expr = function
     | Cbool i ->
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
-        movq (imm 1) !%rdi ++
-        movq !%rdi (ind rax) ++
-        if i then movq (imm 1) !%rdi else movq (imm 0) !%rdi ++
+        movq (imm 1) (ind rax) ++
+        (if i then movq (imm 1) !%rdi else movq (imm 0) !%rdi) ++
         movq !%rdi (ind ~ofs:8 rax)
     | Cstr s ->
         let n = String.length s in
-        movq (imm (8 + n + 1)) !%rdi ++
+        movq (imm (16 + n + 1)) !%rdi ++
         call "my_malloc" ++
         fst (String.fold_left (fun (ins,i) c ->
           ins ++ movb (imm (Char.code c)) (ind ~ofs:i rax), i+1)
-          (movq (imm 3) (ind rax), 8) s) ++
-        movb (imm 0) (ind ~ofs:(8+n) rax))
+          (movq (imm 3) (ind rax), 16) s) ++
+        movq (imm n) (ind ~ofs:8 rax) ++
+        movb (imm 0) (ind ~ofs:(16+n) rax))
+  
+  | Abexpr (b,e1,e2) when b = Baddstr -> 
+      compile_expr e1 ++
+      pushq !%rax ++
+      compile_expr e2 ++
+      movq !%rax !%rdi ++
+      popq rax ++
+      movq (ind ~ofs:8 rdi) !%rdx ++
+      movq (ind ~ofs:8 rax) !%rsi ++
+      pushq !%rdi ++
+      pushq !%rax ++
+      movq !%rdx !%rdi ++
+      addq !%rsi !%rdi ++
+      pushq !%rdi ++
+      addq (imm 17) !%rdi ++
+      call "my_malloc" ++
+      movq (imm 3) (ind rax) ++
+      popq rdi ++
+      movq !%rdi (ind ~ofs:8 rax) ++
+      popq rdx ++
+      movq (imm 16) !%rcx ++
+      movq (imm 16) !%rdi ++
+      label "1" ++
+      cmpb (imm 0) (ind ~index:rdi rdx) ++
+      je "1f" ++
+      movb (ind ~index:rdi rdx) !%sil ++
+      movb !%sil (ind ~index:rcx rax) ++
+      incq !%rcx ++
+      incq !%rdi ++
+      jmp "1b" ++
+      label "1" ++
+      popq rdx ++
+      movq (imm 16) !%rdi ++
+      label "1" ++
+      cmpb (imm 0) (ind ~index:rdi rdx) ++
+      je "1f" ++
+      movb (ind ~index:rdi rdx) !%sil ++
+      movb !%sil (ind ~index:rcx rax) ++
+      incq !%rcx ++
+      incq !%rdi ++
+      jmp "1b" ++
+      label "1" ++
+      movb (imm 0) (ind ~index:rcx rax)
+
+  | Abexpr (b, e1, e2) when b = Bor ->
+      movq (imm 16) !%rdi ++
+      call "my_malloc" ++
+      movq (imm 1) (ind rax) ++
+      pushq !%rax ++
+      compile_expr e1 ++
+      cmpq (imm 1) (ind ~ofs:8 rax ) ++
+      je "1f" ++
+      compile_expr e2 ++
+      cmpq (imm 1) (ind ~ofs:8 rax ) ++
+      je "1f" ++
+      movq (imm 0) !%rdi ++
+      jmp "2f" ++
+      label "1" ++
+      movq (imm 1) !%rdi ++
+      label "2" ++
+      popq rax ++
+      movq !%rdi (ind ~ofs:8 rax)
+
+  | Abexpr (b, e1, e2) when b = Band ->
+      movq (imm 16) !%rdi ++
+      call "my_malloc" ++
+      movq (imm 1) (ind rax) ++
+      pushq !%rax ++
+      compile_expr e1 ++
+      cmpq (imm 0) (ind ~ofs:8 rax ) ++
+      je "1f" ++
+      compile_expr e2 ++
+      cmpq (imm 0) (ind ~ofs:8 rax ) ++
+      je "1f" ++
+      movq (imm 1) !%rdi ++
+      jmp "2f" ++
+      label "1" ++
+      movq (imm 0) !%rdi ++
+      label "2" ++
+      popq rax ++
+      movq !%rdi (ind ~ofs:8 rax)
 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
@@ -118,8 +199,8 @@ let rec compile_expr = function
               ++ label l
               ++ movq (imm 0) !%rax
               ++ label l2
-            | Band -> andq !%rdx !%rax
-            | Bor -> orq !%rdx !%rax
+            | Band -> assert false
+            | Bor -> assert false
             | _ -> assert false
             ) ++ 
             pushq !%rax ++
@@ -144,13 +225,12 @@ let rec compile_expr = function
           pushq !%rax ++
           movq (imm 16) !%rdi ++
           call "my_malloc" ++
-          movq (imm 2) !%rdi ++
-          movq !%rdi (ind rax) ++
+          movq (imm 2) (ind rax) ++
           popq rdi ++
           movq !%rdi (ind ~ofs:8 rax)
 
         (* | _ -> failwith "pas traité" *)
-        | Baddstr -> failwith "pas traité" 
+        | Baddstr -> assert false
         end
     end
   | Aprint i ->
@@ -424,7 +504,7 @@ let compile_program p ofile =
         label "my_malloc" ++
         pushq !%rbp ++
         movq !%rsp !%rbp ++
-        andq (imm (-16)) !%rsp ++
+        (*andq (imm (-16)) !%rsp ++*)
         (*movq (ind ~ofs:24 rbp) !%rdi ++*)
         call "malloc" ++
         movq !%rbp !%rsp ++
@@ -434,7 +514,7 @@ let compile_program p ofile =
         pushq !%rbp ++
         pushq !%rdi ++
         movq !%rsp !%rbp ++
-        andq (imm (-16)) !%rsp ++
+        (*andq (imm (-16)) !%rsp ++*)
         cmpq (imm 1) (ind rdi) ++
         je "1f" ++
         cmpq (imm 2) (ind rdi) ++
@@ -461,7 +541,7 @@ let compile_program p ofile =
         call "printf" ++
         jmp "7f" ++
         label "3" ++
-        addq (imm 8) !%rdi ++
+        addq (imm 16) !%rdi ++
         movq !%rdi !%rsi ++
         movq (ilab ".Sprint_str") !%rdi ++
         movq (imm 0) !%rax ++
