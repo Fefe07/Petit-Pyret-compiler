@@ -71,7 +71,7 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
     let e1', i1 = alloc_expr env fpcur e1 in
     let e2', i2 = alloc_expr env fpcur e2 in
     let e3', i3 = alloc_expr env fpcur e3 in
-    Aif(e1', e2', e3'), max (max i1 i2) i3 
+    Aif(e1', e2', e3'), fpcur
   | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) (fpcur: int) = function 
