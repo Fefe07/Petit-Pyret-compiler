@@ -30,7 +30,7 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
     let exp1, s1 = alloc_expr env fpcur e1 in
     let exp2, s2 = alloc_expr env (fpcur + 1) e2 in
     Abexpr (b, exp1, exp2), fpcur
-  | Ecall (expr, [args]) when expr = Evar "print" -> Aprint (fst (alloc_expr env fpcur args)), 0
+  | Ecall (expr, [args]) when expr = Evar "print" -> Aprint (fst (alloc_expr env fpcur args)), fpcur
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
@@ -42,8 +42,16 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
   | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) (fpcur: int) = function 
-  | Sexpr e -> let new_expr, fpcur = alloc_expr env fpcur e in
-    (Aexpr (new_expr,0), fpcur), env
+  | Sexpr e ->
+      let new_expr, fpcur = alloc_expr env fpcur e in
+      (Aexpr (new_expr,0), fpcur), env
+  | Sconst (id, ta, e) | Svar (id,ta,e) -> 
+      let new_expr, fpcur = alloc_expr env fpcur e in
+      (Aconst (id, ta, new_expr, fpcur), fpcur + 1), Smap.add id fpcur env
+  | Saffect (id, e) -> 
+      let new_expr, fpcur = alloc_expr env fpcur e in
+      (Aaffect (Smap.find id env, new_expr, fpcur), fpcur), env
+
 
   | _ -> failwith "alloc_stmt - cas non traité"
 
@@ -60,15 +68,15 @@ let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
 
 let rec compile_expr = function 
+  | Aident i -> 
+      movq (ind ~ofs:(i*(-8)) rbp) !%rax
   | Acst c ->
     (match c with 
     | Cint i ->
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
-        movq (imm 2) !%rdi ++
-        movq !%rdi (ind rax) ++
-        movq (imm i) !%rdi ++
-        movq !%rdi (ind ~ofs:8 rax)
+        movq (imm 2) (ind rax) ++
+        movq (imm i) (ind ~ofs:8 rax)
     | Cbool i ->
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
@@ -253,6 +261,12 @@ let rec compile_expr = function
 
 and compile_stmt = function 
   | Aexpr (e, _) -> compile_expr e
+  | Aconst (_, _, e, _) -> 
+      compile_expr e ++
+      pushq !%rax
+  | Aaffect (i, e, _) -> 
+      compile_expr e ++
+      movq !%rax (ind ~ofs:(-8*i) rbp)
   | _ -> failwith "compile_stmt - cas non traité"
 
 and compile_block instructions = 
@@ -492,14 +506,17 @@ let compile_stmt (codefun, codemain) = function
 *)
 let compile_program p ofile =
   let start_env = Smap.empty in
-  let p, _ = alloc_block p start_env 0 in
+  let p, _ = alloc_block p start_env 1 in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
         globl "main" ++ label "main" ++
+        pushq !%rbp ++
         movq !%rsp !%rbp ++
         code ++
         movq (imm 0) !%rax ++ (* exit *)
+        movq !%rbp !%rsp ++
+        popq rbp ++
         ret ++
         label "my_malloc" ++
         pushq !%rbp ++

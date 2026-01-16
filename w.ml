@@ -389,7 +389,9 @@ and w_expr (exp:expr) (environment:env) : types*expr =
       unify type1 Tint;
       unify type2 Tint;
       Tboolean, Bexpr(op, expr1, expr2)
-    end end
+    end
+    | Baddstr -> assert false
+    end
   | Ecst cst -> ((match cst with 
       | Cbool _ -> Tboolean
       | Cint  _ -> Tint
