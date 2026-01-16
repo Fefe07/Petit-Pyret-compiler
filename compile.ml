@@ -9,15 +9,12 @@ exception VarUndef of string
 
 let (genv : (string, unit) Hashtbl.t) = Hashtbl.create 17
 
-module Smap = Map.Make(String)
-
-type local_env = int Smap.t
-
 let counter = ref 20
 
 let new_label () = 
   counter := !counter + 1 ;
   "l" ^ (string_of_int !counter)
+
 
 let extract_length (s : astmt) : frame_size =
   match s with 
@@ -25,10 +22,53 @@ let extract_length (s : astmt) : frame_size =
   | Aaffect(_,_,i) -> i
   | Avar(_,_,i) -> i
   | Aconst (_,_,i) -> i 
-  | Afun(_,_,_,i) -> i
+  | Afun(_,_,_,i,_,_) -> i
+
+
+let rec get_vars_expr (env:local_env) (fermeture:local_env) fp e = 
+  match e with 
+  | Ecst i -> fermeture, fp
+  | Evar id when id = "print" -> fermeture, fp
+  | Evar id -> if Smap.mem id env then fermeture, fp
+    else if Smap.mem id fermeture then fermeture, fp
+    else Smap.add id fp fermeture, fp + 1
+  | Bexpr (b,e1,e2) -> 
+      let new_ferm, new_fp = get_vars_expr env fermeture fp e1 in 
+      get_vars_expr env new_ferm new_fp e2
+  | Eblock(ins) -> get_vars_block env fermeture fp ins 
+  | Ecall(e, args) -> 
+      List.fold_left (fun (ferm, fp) e -> get_vars_expr env ferm fp e)
+        (get_vars_expr env fermeture fp e) args
+  | Eif(e1,e2,e3) -> 
+    let new_ferm, new_fp = get_vars_expr env fermeture fp e1 in 
+    let new_ferm2, new_fp2 = get_vars_expr env new_ferm new_fp e2 in 
+    get_vars_expr env new_ferm2 new_fp2 e3
+  | Elam _ | Ecases _ -> failwith "not supported"
+
+and get_vars_stmt env fermeture fp s = match s with
+  | Sexpr e -> let new_ferm, new_fp = get_vars_expr env fermeture fp e in
+      env, new_ferm, new_fp
+  | Sconst (id, _, e) | Svar (id,_,e) -> 
+      let new_ferm, new_fp = get_vars_expr env fermeture fp e in
+      Smap.add id 0 env, new_ferm, new_fp
+  | Saffect(id,e) -> 
+      let new_ferm, new_fp = get_vars_expr env fermeture fp e in
+      env, new_ferm, new_fp
+  | Sfun2 (id, args, ins) -> 
+      let new_env = List.fold_left (fun env arg -> Smap.add arg 0 env)
+        (Smap.add id 0 env) args in
+      let fermeture, fp = get_vars_block new_env fermeture fp ins
+      in Smap.add id 0 env, fermeture, fp
+  | Sfun _ -> assert false
+
+and get_vars_block env fermeture fp ins =
+  let _, ferm, fp = List.fold_left (fun (env, fermeture, fp) s -> 
+    get_vars_stmt env fermeture fp s) (env, fermeture, fp) ins
+  in ferm, fp
   
 
-let rec alloc_expr (env: local_env) (fpcur: int) e = 
+
+let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e = 
   (* print_expr e ;
   print_newline(); *)
   match e with 
@@ -36,21 +76,26 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
   | Evar id -> (
     try 
       Aident (Smap.find id env), fpcur
-    with | Not_found -> raise (VarUndef id))
+    with | Not_found ->
+    try 
+        Aferm (Smap.find id fermeture), fpcur
+    with | Not_found ->
+      raise (VarUndef id))
   | Bexpr (b, e1, e2) -> 
-    let exp1, s1 = alloc_expr env fpcur e1 in
-    let exp2, s2 = alloc_expr env (fpcur + 1) e2 in
+    let exp1, s1 = alloc_expr env fermeture fpcur e1 in
+    let exp2, s2 = alloc_expr env fermeture (fpcur + 1) e2 in
     Abexpr (b, exp1, exp2), fpcur
 
   | Eblock(instructions) -> 
     (* let (i,l') = List.fold_left (fun (i, tl) e -> let e',j = alloc_expr env fpcur e in max i j, e' :: tl) (fpcur,[]) l in 
     Ablock(l'),i *)
-    let (code, new_fpcur) = alloc_block instructions env fpcur  in 
-    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
-    (Ablock(code),i' + fpcur)
+    let (code, new_fpcur) = alloc_block instructions env fermeture fpcur  in 
+    (*
+    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in *)
+    (Ablock(code),fpcur)
     
   | Ecall (expr, [args]) when expr = Evar "print" -> 
-    Aprint (fst (alloc_expr env fpcur args)), 0
+    Aprint (fst (alloc_expr env fermeture fpcur args)), 0
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
@@ -62,43 +107,46 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
       elles peuvent être calculée/définies comme fonctions anonymes
       avant d'être appelées*)
     let l, s = List.fold_right (fun e (le, s) -> 
-      let e', s' = alloc_expr env fpcur e in (e'::le, max s s')
+      let e', s' = alloc_expr env fermeture fpcur e in (e'::le, max s s')
     ) l ([],fpcur) in 
-    let f', i = alloc_expr env fpcur f in 
+    let f', i = alloc_expr env fermeture fpcur f in 
     Acall (f',l), max i s 
 
   | Eif (e1, e2, e3) -> 
-    let e1', i1 = alloc_expr env fpcur e1 in
-    let e2', i2 = alloc_expr env fpcur e2 in
-    let e3', i3 = alloc_expr env fpcur e3 in
+    let e1', i1 = alloc_expr env fermeture fpcur e1 in
+    let e2', i2 = alloc_expr env fermeture fpcur e2 in
+    let e3', i3 = alloc_expr env fermeture fpcur e3 in
     Aif(e1', e2', e3'), fpcur
   | _ -> failwith "alloc_expr - cas non traite"
 
-and alloc_stmt (env: local_env) (fpcur: int) = function 
+and alloc_stmt (env: local_env) fermeture (fpcur: int) = function 
   | Sexpr e ->
-      let new_expr, fpcur = alloc_expr env fpcur e in
+      let new_expr, fpcur = alloc_expr env fermeture fpcur e in
       (Aexpr (new_expr,0), fpcur), env
   | Sconst (id, ta, e) | Svar (id,ta,e) -> 
-      let new_expr, fpcur = alloc_expr env fpcur e in
+      let new_expr, fpcur = alloc_expr env fermeture fpcur e in
       (Aconst (id, new_expr, fpcur), fpcur + 1), Smap.add id fpcur env
   | Saffect (id, e) -> 
-      let new_expr, fpcur = alloc_expr env fpcur e in
+      let new_expr, fpcur = alloc_expr env fermeture fpcur e in
       (Aaffect (Smap.find id env, new_expr, fpcur), fpcur), env
   | Sfun2 (ident, args, ins) -> 
       let new_env, _ = List.fold_left (fun (map, i) id -> 
         (Smap.add id i map, i-1)) (Smap.empty, -3) args in
-      let new_expr, fpcur2 = alloc_block ins new_env fpcur in
-      (Afun(ident, args,new_expr, 0 ), fpcur + 1), Smap.add ident fpcur env
+      let new_fermeture, taille = get_vars_block new_env Smap.empty 0 ins in
+      let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 0 in 
+      let ferm_comp = Smap.fold 
+        (fun s i map -> Fmap.add i (fst (alloc_expr (Smap.add ident fpcur env) fermeture 0 (Evar s))) map) new_fermeture Fmap.empty in 
+      (Afun(ident, args,new_expr, 0 , ferm_comp, taille), fpcur + 1), Smap.add ident fpcur env
   | Sfun _ -> failwith "HUGOOOO" 
   (* | _ -> failwith "alloc_stmt - cas non traité" *)
 
-and alloc_block instructions (env: local_env) (fpcur: int) = 
+and alloc_block instructions (env: local_env) fermeture (fpcur: int) = 
     (* Le nouvel environnement n'est pas renvoyé *)
     (*puisque toutes les variables déclarées ne vivent que dans le bloc *)
     let statements, fpcur, _ =
       List.fold_left (
       fun (stmts, fpcur, env) stmt ->
-        let (new_stmt, new_fpcur), new_env = (alloc_stmt env fpcur stmt) in 
+        let (new_stmt, new_fpcur), new_env = (alloc_stmt env fermeture fpcur stmt) in 
         (new_stmt::stmts), new_fpcur, new_env) ([], fpcur, env) instructions
     in (List.rev statements), fpcur
 
@@ -110,6 +158,9 @@ let pushn n = subq (imm n) !%rsp
 let rec compile_expr = function 
   | Aident i -> 
       movq (ind ~ofs:(i*(-8)) rbp) !%rax
+  | Aferm i -> 
+      movq (ind ~ofs:16 rbp) !%rdi ++
+      movq (ind ~ofs:(i*8) rdi) !%rax
   | Acst c ->
     (match c with 
     | Cint i ->
@@ -325,7 +376,8 @@ and compile_stmt = function
       (*TODO on doit pouvoir free ici*)
       movq !%rax (ind ~ofs:(-8*i) rbp)
 
-  | Afun (id, args, ins, _) -> 
+  | Afun (id, args, ins, _, fermeture, taille) -> 
+      let base =
       let fin = new_label () in
       let nom = new_label () in
       jmp fin ++
@@ -337,12 +389,21 @@ and compile_stmt = function
       popq rbp ++
       ret ++
       label fin ++
-      movq (imm 16) !%rdi ++
+      movq (imm (16 + 8*taille)) !%rdi ++
       call "my_malloc" ++
       movq (imm 6) (ind rax) ++
       leaq (lab nom) rdx ++
       movq !%rdx (ind ~ofs:8 rax) ++
       pushq !%rax
+      in 
+      Fmap.fold (fun i e code ->
+        code ++
+        compile_expr e ++
+        popq rdi ++
+        popq rax ++
+        movq !%rdi (ind ~ofs:(16 + 8*i) rax) ++
+        pushq !%rax
+      ) fermeture base
 
   | _ -> failwith "compile_stmt - cas non traité"
 
@@ -585,7 +646,7 @@ let compile_stmt (codefun, codemain) = function
 let compile_program p ofile =
   let start_env = Smap.add "nothing" 2 (Smap.singleton "num-modulo" 1) in
   let start_fpcur = 3 in (* 1 pour num_modulo et 2 pour nothing*)
-  let p, _ = alloc_block p start_env start_fpcur in
+  let p, _ = alloc_block p start_env Smap.empty start_fpcur in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
@@ -627,12 +688,19 @@ let compile_program p ofile =
         pushq !%rdi ++
         movq !%rsp !%rbp ++
         (*andq (imm (-16)) !%rsp ++*)
+        cmpq (imm 0) (ind rdi) ++
+        je "0f" ++
         cmpq (imm 1) (ind rdi) ++
         je "1f" ++
         cmpq (imm 2) (ind rdi) ++
         je "2f" ++
         cmpq (imm 3) (ind rdi) ++
         je "3f" ++
+        jmp "7f" ++
+        label "0" ++
+        movq (ilab ".nothing") !%rdi++
+        movq (imm 0) !%rax ++
+        call "printf" ++
         jmp "7f" ++
         label "1" ++
         cmpq (imm 1) (ind ~ofs:8 rdi) ++
@@ -706,7 +774,8 @@ let compile_program p ofile =
           (label ".Sprint_int" ++ string "%d" ++
           label ".Sprint_str" ++ string "%s" ++
           label ".true" ++ string "true" ++
-          label ".false" ++ string "false")
+          label ".false" ++ string "false" ++
+          label ".nothing" ++ string "nothing")
     }
   in
   let f = open_out ofile in

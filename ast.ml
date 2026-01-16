@@ -15,6 +15,12 @@ type binop =
 
 type ident = string
 
+module Smap = Map.Make(String)
+module Fmap = Map.Make(Int)
+
+type local_env = int Smap.t
+
+
 type types =
   | Tvar of tvar    (* Une variable de type *)
   | Talpha of ident (* Un type polymorphe et son nom *)
@@ -53,7 +59,7 @@ and astmt =
   | Aaffect of int * aexpr * frame_size
   | Avar of ident * aexpr * frame_size
   | Aconst of ident * aexpr * frame_size 
-  | Afun of ident * ident list * ablock * frame_size
+  | Afun of ident * ident list * ablock * frame_size * fermeture * int
 
 and block = stmt list
 and ablock = astmt list
@@ -72,6 +78,7 @@ and aexpr =
   | Abexpr of binop * aexpr * aexpr
   | Acst of cst
   | Aident of int
+  | Aferm of int
   | Ablock of ablock
   | Alam of afunbody
   | Acall of aexpr * aexpr list
@@ -83,6 +90,7 @@ and funbody = Funbody of param list * type_annotation * block
 and afunbody = Afunbody of param list * type_annotation * ablock
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
 and abranch = Branch1 of ident * ablock | Branch2 of ident * ident list * ablock
+and fermeture = aexpr Fmap.t
 
 
 let rec print_expr = function 
