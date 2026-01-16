@@ -89,8 +89,8 @@ and alloc_stmt (env: local_env) (fpcur: int) = function
         (Smap.add id i map, i-1)) (Smap.empty, -3) args in
       let new_expr, fpcur2 = alloc_block ins new_env fpcur in
       (Afun(ident, args,new_expr, 0 ), fpcur + 1), Smap.add ident fpcur env
-
-  | _ -> failwith "alloc_stmt - cas non traité"
+  | Sfun _ -> failwith "HUGOOOO" 
+  (* | _ -> failwith "alloc_stmt - cas non traité" *)
 
 and alloc_block instructions (env: local_env) (fpcur: int) = 
     (* Le nouvel environnement n'est pas renvoyé *)
@@ -583,8 +583,9 @@ let compile_stmt (codefun, codemain) = function
     codefun, codemain ++ code
 *)
 let compile_program p ofile =
-  let start_env = Smap.empty in
-  let p, _ = alloc_block p start_env 1 in
+  let start_env = Smap.add "nothing" 0 Smap.empty in
+  let start_fpcur = 2 in (* 1 pour  et 1 pour nothing*)
+  let p, _ = alloc_block p start_env start_fpcur in 
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
     { text =
@@ -666,7 +667,7 @@ let compile_program p ofile =
         movq (imm 2) (ind rax) ++
         movq !%rdi (ind ~ofs:8 rax) ++
         popq rbp ++
-        ret;
+        ret ;
 
         
       data =

@@ -4,3 +4,5 @@ if 42 < 69:
 else:
     print( "0\n" )
 end
+
+print(42 == 42)
