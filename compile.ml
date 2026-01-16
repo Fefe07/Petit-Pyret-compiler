@@ -659,11 +659,26 @@ let compile_program p ofile =
         movq (ind ~ofs:8 rsi) !%rax ++
         movq (ind ~ofs:32 rbp) !%rsi ++
         movq (ind ~ofs:8 rsi) !%rdx ++
+        movq (imm 0) !%rsi ++
+        cmpq (imm 0) !%rdx ++
+        jg "1f" ++
+        movq (imm 1) !%rsi ++
+        negq !%rdx ++
+        negq !%rax ++
+        label "1" ++
+        cmpq (imm 0) !%rax ++
+        jg "1f" ++
+        addq !%rdx !%rax ++
+        jmp "1b" ++
         label "1" ++
         cmpq !%rax !%rdx ++
         jg "1f" ++
         subq !%rdx !%rax ++
         jmp "1b" ++
+        label "1" ++
+        cmpq (imm 0) !%rsi ++
+        je "1f" ++
+        negq !%rax ++
         label "1" ++
         pushq !%rax ++
         movq (imm 16) !%rdi ++
