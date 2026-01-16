@@ -49,9 +49,9 @@ type stmt =
 
 and astmt = 
   | Aexpr of aexpr * frame_size
-  | Aaffect of ident * expr * frame_size
-  | Avar of ident * type_annotation * expr * frame_size
-  | Aconst of ident * type_annotation * expr * frame_size 
+  | Aaffect of int * aexpr * frame_size
+  | Avar of ident * type_annotation * aexpr * frame_size
+  | Aconst of ident * type_annotation * aexpr * frame_size 
   | Afun of ident * ident list * param list * type_annotation * block * frame_size
 
 and block = stmt list
