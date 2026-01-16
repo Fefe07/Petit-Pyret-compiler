@@ -86,7 +86,7 @@ and abranch = Branch1 of ident * ablock | Branch2 of ident * ident list * ablock
 
 let rec print_expr = function 
   | Eif(e1,e2,e3) -> 
-    (print_string "Eif\nConsition :\n" ; 
+    (print_string "Eif\nCondition :\n" ; 
     print_expr e1 ;
     print_string "Si :\n" ; 
     print_expr e2 ;
@@ -100,4 +100,10 @@ let rec print_expr = function
     | Cint i -> print_int i 
     | Cbool b -> if b then print_string "true" else print_string "false"
   end
+  | Eblock b -> print_string "block:" ; List.iter print_stmt b
+  | Evar v -> print_string ("var"^v)
   | _ -> print_string "Autre\n"
+
+and print_stmt = function
+| Sexpr e -> print_expr e 
+| _ -> print_string "Autre stmt\n"

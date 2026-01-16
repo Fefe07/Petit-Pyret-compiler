@@ -19,8 +19,18 @@ let new_label () =
   counter := !counter + 1 ;
   "l" ^ (string_of_int !counter)
 
+let extract_length (s : astmt) : frame_size =
+  match s with 
+  | Aexpr(_,i) -> i
+  | Aaffect(_,_,i) -> i
+  | Avar(_,_,_,i) -> i
+  | Aconst (_,_,_,i) -> i 
+  | Afun(_,_,_,_,_,i) -> i
+  
+
 let rec alloc_expr (env: local_env) (fpcur: int) e = 
-  print_expr e ;
+  (* print_expr e ;
+  print_newline(); *)
   match e with 
   | Ecst i -> Acst i, fpcur
   | Evar id -> (
@@ -31,10 +41,32 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
     let exp1, s1 = alloc_expr env fpcur e1 in
     let exp2, s2 = alloc_expr env (fpcur + 1) e2 in
     Abexpr (b, exp1, exp2), fpcur
-  | Ecall (expr, [args]) when expr = Evar "print" -> Aprint (fst (alloc_expr env fpcur args)), 0
+
+  | Eblock(instructions) -> 
+    (* let (i,l') = List.fold_left (fun (i, tl) e -> let e',j = alloc_expr env fpcur e in max i j, e' :: tl) (fpcur,[]) l in 
+    Ablock(l'),i *)
+    let (code, new_fpcur) = alloc_block instructions env fpcur  in 
+    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
+    (Ablock(code),i' + fpcur)
+    
+  | Ecall (expr, [args]) when expr = Evar "print" || expr = Ecst (Cstr "print") -> 
+    Aprint (fst (alloc_expr env fpcur args)), 0
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
+
+  | Ecall (f, l) ->
+    (* Créée un bug car f est une expression *)
+    (* TODO : comprendre Ecall *)
+    (* Comme les fonctions sont des valeurs de première classe,
+      elles peuvent être calculée/définies comme fonctions anonymes
+      avant d'être appelées*)
+    let l, s = List.fold_right (fun e (le, s) -> 
+      let e', s' = alloc_expr env fpcur e in (e'::le, max s s')
+    ) l ([],fpcur) in 
+    let f', i = alloc_expr env fpcur f in 
+    Acall (f',l), max i s 
+
   | Eif (e1, e2, e3) -> 
     let e1', i1 = alloc_expr env fpcur e1 in
     let e2', i2 = alloc_expr env fpcur e2 in
@@ -43,19 +75,23 @@ let rec alloc_expr (env: local_env) (fpcur: int) e =
   | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) (fpcur: int) = function 
+  (*  *)
   | Sexpr e -> let new_expr, fpcur = alloc_expr env fpcur e in
     (Aexpr (new_expr,0), fpcur), env
 
   | _ -> failwith "alloc_stmt - cas non traité"
 
 and alloc_block instructions (env: local_env) (fpcur: int) = 
+    (* Le nouvel environnement n'est pas renvoyé *)
+    (*puisque toutes les variables déclarées ne vivent que dans le bloc *)
     let statements, fpcur, _ =
       List.fold_left (
       fun (stmts, fpcur, env) stmt ->
         let (new_stmt, new_fpcur), new_env = (alloc_stmt env fpcur stmt) in 
-        new_stmt::stmts, new_fpcur, new_env) ([], fpcur, env) instructions
+        (new_stmt::stmts), new_fpcur, new_env) ([], fpcur, env) instructions
     in (List.rev statements), fpcur
 
+(* and alloc env fpcur = List.fold_left (alloc_stmt env fpcur)  *)
 
 let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
@@ -140,13 +176,16 @@ let rec compile_expr = function
   | Aif(e1,e2,e3) -> 
     (* TODO : À modifier avec le nouveau type de données *)
     compile_expr e1 ++ 
-    cmpq (imm 0) !%rax ++
+    cmpq (imm 0) !%rax ++ 
+    (* cmpq (imm 0) (ind ~ofs:8 rax) ++ *)
     jne "1f" ++
     compile_expr e3 ++
     jmp "2f" ++
     label "1" ++
     compile_expr e2 ++ 
     label "2"
+
+  | Ablock(b) -> compile_block b
 
   | _ -> failwith "compile_expr - cas non traité"
 
@@ -156,6 +195,7 @@ and compile_stmt = function
 
 and compile_block instructions = 
   List.fold_left (fun c s -> c ++ compile_stmt s) nop instructions
+
 
 
 
