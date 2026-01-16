@@ -285,8 +285,8 @@ let rec compile_expr = function
   | Aif(e1,e2,e3) -> 
     (* TODO : À modifier avec le nouveau type de données *)
     compile_expr e1 ++ 
-    cmpq (imm 0) !%rax ++ 
-    (* cmpq (imm 0) (ind ~ofs:8 rax) ++ *)
+    (* cmpq (imm 0) !%rax ++  *)
+    cmpq (imm 0) (ind ~ofs:8 rax) ++
     jne "1f" ++
     compile_expr e3 ++
     jmp "2f" ++
