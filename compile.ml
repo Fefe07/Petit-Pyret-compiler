@@ -28,7 +28,6 @@ let extract_length (s : astmt) : frame_size =
 let rec get_vars_expr (env:local_env) (fermeture:local_env) fp e = 
   match e with 
   | Ecst i -> fermeture, fp
-  | Evar id when id = "print" -> fermeture, fp
   | Evar id -> if Smap.mem id env then fermeture, fp
     else if Smap.mem id fermeture then fermeture, fp
     else Smap.add id fp fermeture, fp + 1
@@ -59,7 +58,7 @@ and get_vars_stmt env fermeture fp s = match s with
         (Smap.add id 0 env) args in
       let fermeture, fp = get_vars_block new_env fermeture fp ins
       in Smap.add id 0 env, fermeture, fp
-  | Sfun _ -> assert false
+  | Sfun (id, _,_,_,_) -> print_endline id; assert false
 
 and get_vars_block env fermeture fp ins =
   let _, ferm, fp = List.fold_left (fun (env, fermeture, fp) s -> 
@@ -94,8 +93,6 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
     let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in *)
     (Ablock(code),fpcur)
     
-  | Ecall (expr, [args]) when expr = Evar "print" -> 
-    Aprint (fst (alloc_expr env fermeture fpcur args)), 0
   (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
       List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
   *)
@@ -427,7 +424,7 @@ let rec compile_expr = function
             | Bsub -> subq !%rdx !%rax
             | Bmul -> imulq !%rdx !%rax
             | Bdiv -> movq !%rdx !%rbx ++
-                movq (imm 0) !%rdx ++
+                cqto ++
                 idivq !%rbx 
                 (* Si j'ai bien compris ça marche *)
             | _ -> assert false
@@ -449,16 +446,17 @@ let rec compile_expr = function
       call "print"
 
   | Aif(e1,e2,e3) -> 
-    (* TODO : À modifier avec le nouveau type de données *)
+    let l1 = new_label () in 
+    let l2 = new_label () in
     compile_expr e1 ++ 
     (* cmpq (imm 0) !%rax ++  *)
     cmpq (imm 0) (ind ~ofs:8 rax) ++
-    jne "1f" ++
+    jne l1 ++
     compile_expr e3 ++
-    jmp "2f" ++
-    label "1" ++
+    jmp l2 ++
+    label l1 ++
     compile_expr e2 ++ 
-    label "2"
+    label l2
 
   | Ablock(b) -> compile_block b
   | Acall (f, args) -> 
@@ -756,16 +754,17 @@ let compile_stmt (codefun, codemain) = function
 *)
 let compile_program p ofile =
   let start_env = 
-
-    Smap.add "link" 4 (
-      Smap.add "empty" 3 (
-        Smap.add "nothing" 2 (
-          Smap.singleton "num-modulo" 1))) in
-  let start_fpcur = 4 in 
-  (* 1 pour num_modulo 
-     2 pour nothing  
-     3 pour empty 
-     4 pour link()*)
+    Smap.add "print" 1 (
+    Smap.add "link" 5 (
+      Smap.add "empty" 4 (
+        Smap.add "nothing" 3 (
+          Smap.singleton "num-modulo" 2)))) in
+  let start_fpcur = 6 in 
+  (* 1 pour print
+     2 pour num_modulo 
+     3 pour nothing  
+     4 pour empty 
+     5 pour link()*)
   let p, _ = alloc_block p start_env Smap.empty start_fpcur in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
@@ -773,6 +772,13 @@ let compile_program p ofile =
         globl "main" ++ label "main" ++
         pushq !%rbp ++
         movq !%rsp !%rbp ++
+      (* On alloue print*)
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "print") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++
       (* On alloue num_modulo *)
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
@@ -819,8 +825,8 @@ let compile_program p ofile =
         ret ++
         label "print" ++
         pushq !%rbp ++
-        pushq !%rdi ++
         movq !%rsp !%rbp ++
+        movq (ind ~ofs:24 rbp) !%rdi ++
         (*andq (imm (-16)) !%rsp ++*)
         cmpq (imm 0) (ind rdi) ++
         je "0f" ++
@@ -862,7 +868,7 @@ let compile_program p ofile =
         call "printf" ++
         jmp "7f" ++
         label "7" ++
-        popq rax ++
+        movq (ind ~ofs:24 rbp) !%rax ++
         popq rbp ++
         ret ++
         label "num_modulo" ++
@@ -871,24 +877,21 @@ let compile_program p ofile =
         movq (ind ~ofs:24 rbp) !%rsi ++
         movq (ind ~ofs:8 rsi) !%rax ++
         movq (ind ~ofs:32 rbp) !%rsi ++
-        movq (ind ~ofs:8 rsi) !%rdx ++
+        movq (ind ~ofs:8 rsi) !%rbx ++
         movq (imm 0) !%rsi ++
-        cmpq (imm 0) !%rdx ++
+        cmpq (imm 0) !%rbx ++
         jg "1f" ++
         movq (imm 1) !%rsi ++
-        negq !%rdx ++
+        negq !%rbx ++
         negq !%rax ++
         label "1" ++
-        cmpq (imm 0) !%rax ++
-        jg "1f" ++
-        addq !%rdx !%rax ++
-        jmp "1b" ++
+        cqto ++
+        idivq !%rbx  ++
+        cmpq (imm 0) !%rdx ++
+        jge "1f" ++
+        addq !%rbx !%rdx ++
         label "1" ++
-        cmpq !%rax !%rdx ++
-        jg "1f" ++
-        subq !%rdx !%rax ++
-        jmp "1b" ++
-        label "1" ++
+        movq !%rdx !%rax ++
         cmpq (imm 0) !%rsi ++
         je "1f" ++
         negq !%rax ++
