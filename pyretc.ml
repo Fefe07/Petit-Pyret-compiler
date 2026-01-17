@@ -59,7 +59,7 @@ let () =
        n'est détectée.
        La fonction Lexer.token est utilisée par Parser.file pour obtenir
        le prochain token. *)
-    let p = Parser.file (fun buff -> let t = Lexer.next_token buff in (*Lexer.pp_tok t ;*) t) buf in
+    let p = Parser.file (fun buff -> let t = Lexer.next_token buff in (*Lexer.pp_tok t ; *)t) buf in
     close_in f;
 
     (* On s'arrête ici si on ne veut faire que le parsing *)

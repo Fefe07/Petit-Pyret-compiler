@@ -189,7 +189,7 @@ caller:
   }
 
 call_argstar:
-  | LP_CALL ; RP {[]}
+  | LP_CALL ; RP {[[]]}
   | LP_CALL; b = bexprstar {[b]}
   | LP_CALL; b = bexprstar; b2 = call_argstar {b::b2}
 

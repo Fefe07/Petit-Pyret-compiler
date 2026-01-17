@@ -101,8 +101,8 @@ let rec print_expr = function
     print_expr e2 ;
     print_string "Sinon :\n" ; 
     print_expr e3)
-  | Bexpr (_,e1,e2) -> (print_string "Binop\n"; print_expr e1; print_expr e2)
-  | Ecall (e, l) -> print_string "Appel" ; print_expr e ; List.iter print_expr l 
+  | Bexpr (_,e1,e2) -> (print_string "Binop\n"; print_expr e1; print_newline (); print_expr e2)
+  | Ecall (e, l) -> print_string "Appel " ; print_expr e ; List.iter print_expr l; print_newline ();
   | Ecst c -> begin 
     match c with 
     | Cstr s -> print_string s 
@@ -110,7 +110,7 @@ let rec print_expr = function
     | Cbool b -> if b then print_string "true" else print_string "false"
   end
   | Eblock b -> print_string "block:" ; List.iter print_stmt b
-  | Evar v -> print_string ("var"^v)
+  | Evar v -> print_string ("var "^v^" ")
   | _ -> print_string "Autre\n"
 
 and print_stmt = function

@@ -413,7 +413,7 @@ and w_expr (exp:expr) (environment:env) : types*expr =
       let f_type, f_expr = w_expr func environment in begin
       match f_type with
       | Tfun (targs, tret) -> begin
-        try
+        try 
           tret, Ecall (f_expr,
           List.fold_left2 (fun ins x y ->
             let type1, expr1 = (w_expr y environment) in

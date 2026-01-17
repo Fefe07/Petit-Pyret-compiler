@@ -33,13 +33,21 @@
   (match t with 
   | BINOP Blt -> print_string "<\n"
   | BINOP Bgt -> print_string ">\n"
+  | PLUS -> print_endline "+"
   | EQUAL -> print_string "=\n"
   | IDENT s -> print_string (s^"\n") 
   | FUN  -> print_string "fun\n"
   | LEFT_CHEV -> print_string "left_chev\n" 
-  | CINT n -> print_int n 
+  | CINT n -> print_int n; print_newline ()
   | BINOP Badd -> print_string "+\n"
   | EOF -> print_string "eof\n"
+  | RP -> print_endline "RP"
+  | LP_CALL -> print_endline "LP_CALL"
+  | LP -> print_endline "LP"
+  | ARROW -> print_endline "ARROW"
+  | BLOCK -> print_endline "BLOCK"
+  | COLON -> print_endline "COLON"
+  | END -> print_endline "END"
 
   | _ -> print_string " pas traité\n" 
 
