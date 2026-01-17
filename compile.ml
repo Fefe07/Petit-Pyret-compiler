@@ -133,7 +133,7 @@ and alloc_stmt (env: local_env) fermeture (fpcur: int) = function
       let new_env, _ = List.fold_left (fun (map, i) id -> 
         (Smap.add id i map, i-1)) (Smap.empty, -3) args in
       let new_fermeture, taille = get_vars_block new_env Smap.empty 0 ins in
-      let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 0 in 
+      let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 1 in 
       let ferm_comp = Smap.fold 
         (fun s i map -> Fmap.add i (fst (alloc_expr (Smap.add ident fpcur env) fermeture 0 (Evar s))) map) new_fermeture Fmap.empty in 
       (Afun(ident, args,new_expr, 0 , ferm_comp, taille), fpcur + 1), Smap.add ident fpcur env
