@@ -6,6 +6,12 @@ main:
 	movq $16, %rdi
 	call my_malloc
 	movq $6, 0(%rax)
+	leaq print(%rip), %rdx
+	movq %rdx, 8(%rax)
+	pushq %rax
+	movq $16, %rdi
+	call my_malloc
+	movq $6, 0(%rax)
 	leaq num_modulo(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
@@ -44,8 +50,13 @@ main:
 	call equality
 	popq %rdi
 	popq %rdi
-	movq %rax, %rdi
-	call print
+	pushq %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
@@ -59,8 +70,13 @@ main:
 	call equality
 	popq %rdi
 	popq %rdi
-	movq %rax, %rdi
-	call print
+	pushq %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
 	movq $21, %rdi
 	call my_malloc
 	movq $3, 0(%rax)
@@ -84,25 +100,35 @@ main:
 	call equality
 	popq %rdi
 	popq %rdi
-	movq %rax, %rdi
-	call print
-	movq -24(%rbp), %rax
 	pushq %rax
-	movq -24(%rbp), %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
+	movq -32(%rbp), %rax
+	pushq %rax
+	movq -32(%rbp), %rax
 	pushq %rax
 	call equality
 	popq %rdi
 	popq %rdi
-	movq %rax, %rdi
-	call print
-	movq -24(%rbp), %rax
+	pushq %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
+	movq -32(%rbp), %rax
 	pushq %rax
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
 	movq $1, 8(%rax)
 	pushq %rax
-	movq -32(%rbp), %rax
+	movq -40(%rbp), %rax
 	addq $16, %rax
 	pushq %rax
 	call *-8(%rax)
@@ -110,14 +136,14 @@ main:
 	popq %rdi
 	popq %rdi
 	pushq %rax
-	movq -24(%rbp), %rax
+	movq -32(%rbp), %rax
 	pushq %rax
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
 	movq $2, 8(%rax)
 	pushq %rax
-	movq -32(%rbp), %rax
+	movq -40(%rbp), %rax
 	addq $16, %rax
 	pushq %rax
 	call *-8(%rax)
@@ -128,16 +154,26 @@ main:
 	call equality
 	popq %rdi
 	popq %rdi
-	movq %rax, %rdi
-	call print
+	pushq %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
 	movq $18, %rdi
 	call my_malloc
 	movq $3, 0(%rax)
 	movb $10, 16(%rax)
 	movq $1, 8(%rax)
 	movb $0, 17(%rax)
-	movq %rax, %rdi
-	call print
+	pushq %rax
+	movq -8(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
 	movq $0, %rax
 	movq %rbp, %rsp
 	popq %rbp
@@ -151,8 +187,8 @@ my_malloc:
 	ret
 print:
 	pushq %rbp
-	pushq %rdi
 	movq %rsp, %rbp
+	movq 24(%rbp), %rdi
 	cmpq $0, 0(%rdi)
 	je 0f
 	cmpq $1, 0(%rdi)
@@ -193,7 +229,7 @@ print_true:
 	call printf
 	jmp 7f
 7:
-	popq %rax
+	movq 24(%rbp), %rax
 	popq %rbp
 	ret
 num_modulo:
@@ -202,24 +238,21 @@ num_modulo:
 	movq 24(%rbp), %rsi
 	movq 8(%rsi), %rax
 	movq 32(%rbp), %rsi
-	movq 8(%rsi), %rdx
+	movq 8(%rsi), %rbx
 	movq $0, %rsi
-	cmpq $0, %rdx
+	cmpq $0, %rbx
 	jg 1f
 	movq $1, %rsi
-	negq %rdx
+	negq %rbx
 	negq %rax
 1:
-	cmpq $0, %rax
-	jg 1f
-	addq %rdx, %rax
-	jmp 1b
+	cqto
+	idivq %rbx
+	cmpq $0, %rdx
+	jge 1f
+	addq %rbx, %rdx
 1:
-	cmpq %rax, %rdx
-	jg 1f
-	subq %rdx, %rax
-	jmp 1b
-1:
+	movq %rdx, %rax
 	cmpq $0, %rsi
 	je 1f
 	negq %rax
@@ -234,17 +267,19 @@ num_modulo:
 	ret
 link:
 	pushq %rbp
+	movq %rsp, %rbp
 	movq 24(%rbp), %r10
 	movq 32(%rbp), %r11
 	pushq %r10
 	pushq %r11
-	movq $32, %rdi
+	movq $24, %rdi
 	call my_malloc
 	popq %r11
 	popq %r10
 	movq $5, 0(%rax)
 	movq %r10, 8(%rax)
 	movq %r11, 16(%rax)
+	movq %rbp, %rsp
 	popq %rbp
 	ret
 equality:
@@ -293,19 +328,19 @@ equality:
 	je 9f
 	jmp 6b
 5:
-	pushq %rsi
-	pushq %rdi
-	pushq 8(%rsi)
-	pushq 8(%rdi)
+	pushq %rax
+	pushq %rdx
+	pushq 8(%rax)
+	pushq 8(%rdx)
 	call equality
 	cmpq $0, 8(%rax)
 	je 8b
 	popq %rax
 	popq %rax
-	popq %rdi
-	popq %rsi
-	pushq 16(%rsi)
-	pushq 16(%rdi)
+	popq %rdx
+	popq %rax
+	pushq 16(%rax)
+	pushq 16(%rdx)
 	call equality
 	cmpq $0, 8(%rax)
 	je 8b

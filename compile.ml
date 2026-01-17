@@ -907,17 +907,19 @@ let compile_program p ofile =
 
         label "link" ++
         pushq !%rbp ++
+        movq !%rsp !%rbp ++
         movq (ind ~ofs:24 rbp) !%r10 ++
         movq (ind ~ofs:32 rbp) !%r11 ++
         pushq !%r10 ++
         pushq !%r11 ++
-        movq (imm 32) !%rdi ++
+        movq (imm 24) !%rdi ++
         call "my_malloc" ++
         popq r11 ++
         popq r10 ++
         movq (imm 5) (ind rax) ++
         movq !%r10 (ind ~ofs:8 rax) ++
         movq !%r11 (ind ~ofs:16 rax) ++
+        movq !%rbp !%rsp ++
         popq rbp ++
         ret  ++
         
@@ -980,19 +982,21 @@ let compile_program p ofile =
         (* Il faut compiler et comparer les valeurs dans le link *)
         (* Solution : appels résursifs de l'égalité *)
         (* compile_expr (Abexpr(Beq, (ind ~ofs:8 rsi),(ind ~ofs:8 rdi) )) ++  *)
-        pushq !%rsi ++
-        pushq !%rdi ++ 
-        pushq (ind ~ofs:8 rsi) ++
-        pushq (ind ~ofs:8 rdi) ++
+
+
+        pushq !%rax ++
+        pushq !%rdx ++ 
+        pushq (ind ~ofs:8 rax) ++
+        pushq (ind ~ofs:8 rdx) ++
         call "equality" ++
         cmpq (imm 0) (ind ~ofs:8 rax) ++
         je "8b" ++
-        popq rax ++
+        popq rax ++ (* On se débarasse des valeurs *)
         popq rax ++ 
-        popq rdi ++
-        popq rsi ++
-        pushq (ind ~ofs:16 rsi) ++
-        pushq (ind ~ofs:16 rdi) ++
+        popq rdx ++
+        popq rax ++
+        pushq (ind ~ofs:16 rax) ++
+        pushq (ind ~ofs:16 rdx) ++
         call "equality" ++
         cmpq (imm 0) (ind ~ofs:8 rax) ++
         je "8b" ++
