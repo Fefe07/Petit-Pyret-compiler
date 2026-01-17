@@ -274,7 +274,12 @@ let rec compile_expr = function
     compile_expr e1 ++
     pushq !%rax ++
     compile_expr e2 ++
-    popq rdx ++
+    pushq !%rax ++
+    call "equality" ++
+    popq rdi ++
+    popq rdi 
+
+(*     
     movq (ind rax) !%rsi ++
     movq (ind rdx) !%rdi ++
     cmpq !%rsi !%rdi ++
@@ -291,6 +296,8 @@ let rec compile_expr = function
 
     cmpq (imm 3) !%rsi ++
     je "3f" ++
+    cmpq (imm 5) !%rsi ++
+    je "5f" ++
 
     movq (imm 60) !%rax ++ (*TODO: le reste*)
     movq (imm 2) !%rdi ++
@@ -319,6 +326,13 @@ let rec compile_expr = function
     je "9f" ++
     jmp "6b" ++
 
+    (* Comparaison de link*)
+    label "5" ++
+    (* Il faut compiler et comparer les valeurs dans le link *)
+    (* Solution : appels résursifs de l'égalité *)
+    (* compile_expr (Abexpr(Beq, (ind ~ofs:8 rsi),(ind ~ofs:8 rdi) )) ++  *)
+
+
     label "9" ++
     pushq (imm 1) ++
 
@@ -328,7 +342,7 @@ let rec compile_expr = function
     call "my_malloc" ++
     movq (imm 1) (ind rax) ++
     popq rdi ++
-    movq !%rdi (ind ~ofs:8 rax)
+    movq !%rdi (ind ~ofs:8 rax) *)
 
   | Abexpr (b, e1, e2) when b == Bneq ->
     compile_expr e1 ++
@@ -741,8 +755,17 @@ let compile_stmt (codefun, codemain) = function
     codefun, codemain ++ code
 *)
 let compile_program p ofile =
-  let start_env = Smap.add "nothing" 2 (Smap.singleton "num-modulo" 1) in
-  let start_fpcur = 3 in (* 1 pour num_modulo et 2 pour nothing*)
+  let start_env = 
+
+    Smap.add "link" 4 (
+      Smap.add "empty" 3 (
+        Smap.add "nothing" 2 (
+          Smap.singleton "num-modulo" 1))) in
+  let start_fpcur = 4 in 
+  (* 1 pour num_modulo 
+     2 pour nothing  
+     3 pour empty 
+     4 pour link()*)
   let p, _ = alloc_block p start_env Smap.empty start_fpcur in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
@@ -762,6 +785,20 @@ let compile_program p ofile =
         call "my_malloc" ++
         movq (imm 0) (ind rax) ++
         pushq !%rax ++
+      (* On alloue empty *)
+        movq (imm 8) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 4) (ind rax) ++
+        pushq !%rax ++
+      (* On alloue link (implémenté comme une fonction 
+         qui à x,y associe link(x,y))*)
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "link") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++ 
+
 
       (* Le code compilé est rajouté ici *)
         code ++
@@ -863,7 +900,120 @@ let compile_program p ofile =
         movq (imm 2) (ind rax) ++
         movq !%rdi (ind ~ofs:8 rax) ++
         popq rbp ++
-        ret ;
+        ret ++
+
+        label "link" ++
+        pushq !%rbp ++
+        movq (ind ~ofs:24 rbp) !%r10 ++
+        movq (ind ~ofs:32 rbp) !%r11 ++
+        pushq !%r10 ++
+        pushq !%r11 ++
+        movq (imm 32) !%rdi ++
+        call "my_malloc" ++
+        popq r11 ++
+        popq r10 ++
+        movq (imm 5) (ind rax) ++
+        movq !%r10 (ind ~ofs:8 rax) ++
+        movq !%r11 (ind ~ofs:16 rax) ++
+        popq rbp ++
+        ret  ++
+        
+
+(* Fonction Equality *)
+        label "equality" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        movq (ind ~ofs:16 rbp) !%rax ++
+        movq (ind ~ofs:24 rbp) !%rdx ++
+        movq (ind rax) !%rsi ++
+        movq (ind rdx) !%rdi ++
+
+        cmpq !%rsi !%rdi ++
+        jne "8f" ++
+        (* Discrimine le type des valeurs *)
+        cmpq (imm 0) !%rsi ++
+        je "9f" ++
+        cmpq (imm 4) !%rsi ++
+        je "9f" ++
+        cmpq (imm 1) !%rsi ++
+        je "1f" ++
+        cmpq (imm 2) !%rsi ++
+        je "1f" ++
+
+        cmpq (imm 3) !%rsi ++
+        je "3f" ++
+        cmpq (imm 5) !%rsi ++
+        je "5f" ++
+
+        movq (imm 60) !%rax ++ (*TODO: le reste*)
+        movq (imm 2) !%rdi ++
+        syscall ++
+        label "1" ++
+        movq (ind ~ofs:8 rax) !%rsi ++
+        movq (ind ~ofs:8 rdx) !%rdi ++
+        cmpq !%rsi !%rdi ++
+        je "9f" ++
+        label "8" ++
+        pushq (imm 0) ++
+        jmp "7f" ++
+
+        (* Comparaison de string *)
+        label "3" ++
+        addq (imm 8) !%rax ++
+        addq (imm 8) !%rdx ++
+        label "6" ++
+        movb (ind rax) !%sil ++
+        movb (ind rdx) !%dil ++
+        addq (imm 1) !%rax ++
+        addq (imm 1) !%rdx ++
+        cmpb !%sil !%dil ++
+        jne "8b" ++
+        cmpb (imm 0) !%sil ++  
+        je "9f" ++
+        jmp "6b" ++
+
+        (* Comparaison de link*)
+        label "5" ++
+        (* Il faut compiler et comparer les valeurs dans le link *)
+        (* Solution : appels résursifs de l'égalité *)
+        (* compile_expr (Abexpr(Beq, (ind ~ofs:8 rsi),(ind ~ofs:8 rdi) )) ++  *)
+        pushq !%rsi ++
+        pushq !%rdi ++ 
+        pushq (ind ~ofs:8 rsi) ++
+        pushq (ind ~ofs:8 rdi) ++
+        call "equality" ++
+        cmpq (imm 0) (ind ~ofs:8 rax) ++
+        je "8b" ++
+        popq rax ++
+        popq rax ++ 
+        popq rdi ++
+        popq rsi ++
+        pushq (ind ~ofs:16 rsi) ++
+        pushq (ind ~ofs:16 rdi) ++
+        call "equality" ++
+        cmpq (imm 0) (ind ~ofs:8 rax) ++
+        je "8b" ++
+        jmp "9f"++
+
+
+
+        label "9" ++
+        pushq (imm 1) ++
+
+        (* Inscrit le résultat*)
+        label "7" ++
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 1) (ind rax) ++
+        popq rdi ++
+        movq !%rdi (ind ~ofs:8 rax) ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
+        ret
+
+
+    ;
+
 
         
       data =
