@@ -432,15 +432,17 @@ let rec compile_expr = function
       call "print"
 
   | Aif(e1,e2,e3) -> 
+    let l1 = new_label () in 
+    let l2 = new_label () in
     compile_expr e1 ++ 
     (* cmpq (imm 0) !%rax ++  *)
     cmpq (imm 0) (ind ~ofs:8 rax) ++
-    jne "1f" ++
+    jne l1 ++
     compile_expr e3 ++
-    jmp "2f" ++
-    label "1" ++
+    jmp l2 ++
+    label l1 ++
     compile_expr e2 ++ 
-    label "2"
+    label l2
 
   | Ablock(b) -> compile_block b
   | Acall (f, args) -> 
