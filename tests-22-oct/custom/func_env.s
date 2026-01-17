@@ -16,27 +16,50 @@ main:
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
-	movq $41, 8(%rax)
+	movq $2, 8(%rax)
 	pushq %rax
-	movq -24(%rbp), %rax
-	movq %rax, %rdi
-	call print
+	jmp l21
+l22:
+	pushq %rbp
+	movq %rsp, %rbp
+	movq 16(%rbp), %rdi
+	movq 0(%rdi), %rax
+	pushq 8(%rax)
+	movq 24(%rbp), %rax
+	movq 8(%rax), %rdx
+	popq %rax
+	addq %rdx, %rax
+	pushq %rax
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
-	movq $42, 8(%rax)
-	movq %rax, -24(%rbp)
-	movq -24(%rbp), %rax
-	movq %rax, %rdi
-	call print
-	movq $18, %rdi
+	popq %rdi
+	movq %rdi, 8(%rax)
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+l21:
+	movq $24, %rdi
 	call my_malloc
-	movq $3, 0(%rax)
-	movb $10, 16(%rax)
-	movq $1, 8(%rax)
-	movb $0, 17(%rax)
-	movq %rax, %rdi
-	call print
+	movq $6, 0(%rax)
+	leaq l22(%rip), %rdx
+	movq %rdx, 8(%rax)
+	pushq %rax
+	movq -24(%rbp), %rax
+	popq %rdi
+	movq %rax, 16(%rdi)
+	pushq %rdi
+	movq $16, %rdi
+	call my_malloc
+	movq $2, 0(%rax)
+	movq $3, 8(%rax)
+	pushq %rax
+	movq -32(%rbp), %rax
+	addq $16, %rax
+	pushq %rax
+	call *-8(%rax)
+	popq %rdi
+	popq %rdi
 	movq $0, %rax
 	movq %rbp, %rsp
 	popq %rbp

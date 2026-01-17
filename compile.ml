@@ -106,11 +106,16 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
     (* Comme les fonctions sont des valeurs de première classe,
       elles peuvent être calculée/définies comme fonctions anonymes
       avant d'être appelées*)
-    let l, s = List.fold_right (fun e (le, s) -> 
-      let e', s' = alloc_expr env fermeture fpcur e in (e'::le, max s s')
-    ) l ([],fpcur) in 
-    let f', i = alloc_expr env fermeture fpcur f in 
-    Acall (f',l), max i s 
+
+    (* Évaluation stricte : les paramètres sont évalués avant l'appel *)
+    let l' = List.fold_right (fun expr expr_list -> 
+      let e', _ = alloc_expr env fermeture fpcur expr in e'::expr_list
+    ) l [] in 
+    (* let taille_fermeture = List.length l  in  *)
+    (* Il faut aussi prendre en compte le déplacement de rbp... *)
+    (* Au fait la gestion des fermetures fait que fpcur n'est plus utilisé *)
+    let f', _ = alloc_expr env fermeture (fpcur (*+ taille_fermeture*)) f in 
+    Acall (f',l'), fpcur(* max i s*) (* Pourquoi max ? c'est n'importe quoi ça *)
 
   | Eif (e1, e2, e3) -> 
     let e1', i1 = alloc_expr env fermeture fpcur e1 in
@@ -274,6 +279,7 @@ let rec compile_expr = function
     movq (ind rdx) !%rdi ++
     cmpq !%rsi !%rdi ++
     jne "8f" ++
+    (* Discrimine le type des valeurs *)
     cmpq (imm 0) !%rsi ++
     je "9f" ++
     cmpq (imm 4) !%rsi ++
@@ -282,6 +288,10 @@ let rec compile_expr = function
     je "1f" ++
     cmpq (imm 2) !%rsi ++
     je "1f" ++
+
+    cmpq (imm 3) !%rsi ++
+    je "3f" ++
+
     movq (imm 60) !%rax ++ (*TODO: le reste*)
     movq (imm 2) !%rdi ++
     syscall ++
@@ -293,8 +303,26 @@ let rec compile_expr = function
     label "8" ++
     pushq (imm 0) ++
     jmp "7f" ++
+
+    (* Comparaison de string *)
+    label "3" ++
+    addq (imm 8) !%rax ++
+    addq (imm 8) !%rdx ++
+    label "6" ++
+    movb (ind rax) !%sil ++
+    movb (ind rdx) !%dil ++
+    addq (imm 1) !%rax ++
+    addq (imm 1) !%rdx ++
+    cmpb !%sil !%dil ++
+    jne "8b" ++
+    cmpb (imm 0) !%sil ++  
+    je "9f" ++
+    jmp "6b" ++
+
     label "9" ++
     pushq (imm 1) ++
+
+    (* Inscrit le résultat*)
     label "7" ++
     movq (imm 16) !%rdi ++
     call "my_malloc" ++

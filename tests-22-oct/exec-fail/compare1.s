@@ -13,28 +13,76 @@ main:
 	call my_malloc
 	movq $0, 0(%rax)
 	pushq %rax
-	movq $16, %rdi
+	jmp l21
+l22:
+	pushq %rbp
+	movq %rsp, %rbp
+	movq 16(%rbp), %rdi
+	movq 0(%rdi), %rax
+	movq %rbp, %rsp
+	popq %rbp
+	ret
+l21:
+	movq $24, %rdi
 	call my_malloc
-	movq $2, 0(%rax)
-	movq $41, 8(%rax)
+	movq $6, 0(%rax)
+	leaq l22(%rip), %rdx
+	movq %rdx, 8(%rax)
+	pushq %rax
+	movq -16(%rbp), %rax
+	popq %rdi
+	movq %rax, 16(%rdi)
+	pushq %rdi
+	movq -24(%rbp), %rax
 	pushq %rax
 	movq -24(%rbp), %rax
-	movq %rax, %rdi
-	call print
+	popq %rdx
+	movq 0(%rax), %rsi
+	movq 0(%rdx), %rdi
+	cmpq %rsi, %rdi
+	jne 8f
+	cmpq $0, %rsi
+	je 9f
+	cmpq $4, %rsi
+	je 9f
+	cmpq $1, %rsi
+	je 1f
+	cmpq $2, %rsi
+	je 1f
+	cmpq $3, %rsi
+	je 3f
+	movq $60, %rax
+	movq $2, %rdi
+	syscall
+1:
+	movq 8(%rax), %rsi
+	movq 8(%rdx), %rdi
+	cmpq %rsi, %rdi
+	je 9f
+8:
+	pushq $0
+	jmp 7f
+3:
+	addq $8, %rax
+	addq $8, %rdx
+6:
+	movb 0(%rax), %sil
+	movb 0(%rdx), %dil
+	addq $1, %rax
+	addq $1, %rdx
+	cmpb %sil, %dil
+	jne 8b
+	cmpb $0, %sil
+	je 9f
+	jmp 6b
+9:
+	pushq $1
+7:
 	movq $16, %rdi
 	call my_malloc
-	movq $2, 0(%rax)
-	movq $42, 8(%rax)
-	movq %rax, -24(%rbp)
-	movq -24(%rbp), %rax
-	movq %rax, %rdi
-	call print
-	movq $18, %rdi
-	call my_malloc
-	movq $3, 0(%rax)
-	movb $10, 16(%rax)
-	movq $1, 8(%rax)
-	movb $0, 17(%rax)
+	movq $1, 0(%rax)
+	popq %rdi
+	movq %rdi, 8(%rax)
 	movq %rax, %rdi
 	call print
 	movq $0, %rax
