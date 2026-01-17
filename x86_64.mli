@@ -261,6 +261,7 @@ val sarq: [`Q] operand -> [`Q] operand -> text
 (** {2 Sauts } *)
 
 val call: label -> text
+val syscall: text
 val call_star: [`Q] operand -> text
 val leave: text
 val ret: text

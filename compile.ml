@@ -264,6 +264,78 @@ let rec compile_expr = function
       label "2" ++
       popq rax ++
       movq !%rdi (ind ~ofs:8 rax)
+  
+  | Abexpr (b, e1, e2) when b == Beq ->
+    compile_expr e1 ++
+    pushq !%rax ++
+    compile_expr e2 ++
+    popq rdx ++
+    movq (ind rax) !%rsi ++
+    movq (ind rdx) !%rdi ++
+    cmpq !%rsi !%rdi ++
+    jne "8f" ++
+    cmpq (imm 0) !%rsi ++
+    je "9f" ++
+    cmpq (imm 4) !%rsi ++
+    je "9f" ++
+    cmpq (imm 1) !%rsi ++
+    je "1f" ++
+    cmpq (imm 2) !%rsi ++
+    je "1f" ++
+    movq (imm 60) !%rax ++ (*TODO: le reste*)
+    movq (imm 2) !%rdi ++
+    syscall ++
+    label "1" ++
+    movq (ind ~ofs:8 rax) !%rsi ++
+    movq (ind ~ofs:8 rdx) !%rdi ++
+    cmpq !%rsi !%rdi ++
+    je "9f" ++
+    label "8" ++
+    pushq (imm 0) ++
+    jmp "7f" ++
+    label "9" ++
+    pushq (imm 1) ++
+    label "7" ++
+    movq (imm 16) !%rdi ++
+    call "my_malloc" ++
+    movq (imm 1) (ind rax) ++
+    popq rdi ++
+    movq !%rdi (ind ~ofs:8 rax)
+
+  | Abexpr (b, e1, e2) when b == Bneq ->
+    compile_expr e1 ++
+    pushq !%rax ++
+    compile_expr e2 ++
+    popq rdx ++
+    movq (ind rax) !%rsi ++
+    movq (ind rdx) !%rdi ++
+    cmpq !%rsi !%rdi ++
+    jne "8f" ++
+    cmpq (imm 0) !%rsi ++
+    je "9f" ++
+    cmpq (imm 4) !%rsi ++
+    je "9f" ++
+    cmpq (imm 1) !%rsi ++
+    je "1f" ++
+    cmpq (imm 2) !%rsi ++
+    je "1f" ++
+    exit 2 ++ (*TODO: le reste*)
+    label "1" ++
+    movq (ind ~ofs:8 rax) !%rsi ++
+    movq (ind ~ofs:8 rdx) !%rdi ++
+    cmpq !%rsi !%rdi ++
+    je "9f" ++
+    label "8" ++
+    pushq (imm 1) ++
+    jmp "7f" ++
+    label "9" ++
+    pushq (imm 0) ++
+    label "7" ++
+    movq (imm 16) !%rdi ++
+    call "my_malloc" ++
+    movq (imm 1) (ind rax) ++
+    popq rdi ++
+    movq !%rdi (ind ~ofs:8 rax)
 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
@@ -298,15 +370,12 @@ let rec compile_expr = function
               ++ label l
               ++ movq (imm 0) !%rax
               ++ label l2
-            | Band -> assert false
-            | Bor -> assert false
             | _ -> assert false
             ) ++ 
             pushq !%rax ++
             movq (imm 16) !%rdi ++
             call "my_malloc" ++
-            movq (imm 1) !%rdi ++
-            movq !%rdi (ind rax) ++
+            movq (imm 1) (ind rax) ++
             popq rdi ++
             movq !%rdi (ind ~ofs:8 rax)
             
@@ -355,8 +424,9 @@ let rec compile_expr = function
       compile_expr e ++
       pushq !%rax ++ c) nop args ++
       compile_expr f ++
+      addq (imm 16) !%rax ++
       pushq !%rax ++
-      call_star (ind ~ofs:8 rax))
+      call_star (ind ~ofs:(-8) rax))
       in (
         for i=0 to List.length args do 
           code := !code ++ popq rdi
@@ -400,9 +470,8 @@ and compile_stmt = function
         code ++
         compile_expr e ++
         popq rdi ++
-        popq rax ++
-        movq !%rdi (ind ~ofs:(16 + 8*i) rax) ++
-        pushq !%rax
+        movq !%rax (ind ~ofs:(16 + 8*i) rdi) ++
+        pushq !%rdi
       ) fermeture base
 
   | _ -> failwith "compile_stmt - cas non traité"
