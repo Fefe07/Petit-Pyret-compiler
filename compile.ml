@@ -433,9 +433,9 @@ let rec compile_expr = function
             | Badd -> addq !%rdx !%rax
             | Bsub -> subq !%rdx !%rax
             | Bmul -> imulq !%rdx !%rax
-            | Bdiv -> movq !%rdx !%rbx ++
+            | Bdiv -> movq !%rdx !%r12 ++
                 cqto ++
-                idivq !%rbx 
+                idivq !%r12 
                 (* Si j'ai bien compris ça marche *)
             | _ -> assert false
             ) ++
@@ -736,12 +736,12 @@ let rec compile_expr = function
   | Binop (o, e1, e2)->
       compile_expr e1 ++
       compile_expr e2 ++
-      popq rbx ++ popq rax ++
+      popq r12 ++ popq rax ++
       (match o with
-        | Add -> addq !%rbx !%rax
-        | Sub -> subq !%rbx !%rax
-        | Mul -> imulq !%rbx !%rax
-        | Div -> cqto ++ idivq !%rbx) ++
+        | Add -> addq !%r12 !%rax
+        | Sub -> subq !%r12 !%rax
+        | Mul -> imulq !%r12 !%rax
+        | Div -> cqto ++ idivq !%r12) ++
        pushq !%rax
 
   | Letin (ofs, e1, e2) ->
@@ -881,6 +881,10 @@ let compile_program p ofile =
         je "2f" ++
         cmpq (imm 3) (ind rdi) ++
         je "3f" ++
+        cmpq (imm 4) (ind rdi) ++
+        je "4f" ++
+        cmpq (imm 5) (ind rdi) ++
+        je "4f" ++
         jmp "7f" ++
         label "0" ++
         movq (ilab ".nothing") !%rdi++
@@ -912,6 +916,41 @@ let compile_program p ofile =
         movq (imm 0) !%rax ++
         call "printf" ++
         jmp "7f" ++
+        label "4" ++
+        pushq !%rbx ++
+        movq !%rdi !%rbx ++
+        movq (ilab ".Sprint_list") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        cmpq (imm 4) (ind rbx) ++
+        je "fin_print_list" ++
+        movq (ind ~ofs:8 rbx) !%rdi ++
+        pushq !%rdi ++
+        pushq !%rdi ++
+        call "print" ++
+        addq (imm 16) !%rsp ++
+        movq (ind ~ofs:16 rbx) !%rbx ++
+        label "boucle_print_list" ++
+        cmpq (imm 4) (ind rbx) ++
+        je "fin_print_list" ++
+        movq (ilab ".Sprint_sep") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        movq (ind ~ofs:8 rbx) !%rdi ++
+        pushq !%rdi ++
+        pushq !%rdi ++
+        call "print" ++
+        addq (imm 16) !%rsp ++
+        movq (ind ~ofs:16 rbx) !%rbx ++
+        jmp "boucle_print_list" ++
+
+        label "fin_print_list"++
+        movq (ilab ".Sprint_fin_list") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        popq rbx ++
+        jmp "7f" ++
+
         label "7" ++
         movq (ind ~ofs:24 rbp) !%rax ++
         popq rbp ++
@@ -922,19 +961,19 @@ let compile_program p ofile =
         movq (ind ~ofs:24 rbp) !%rsi ++
         movq (ind ~ofs:8 rsi) !%rax ++
         movq (ind ~ofs:32 rbp) !%rsi ++
-        movq (ind ~ofs:8 rsi) !%rbx ++
+        movq (ind ~ofs:8 rsi) !%r12 ++
         movq (imm 0) !%rsi ++
-        cmpq (imm 0) !%rbx ++
+        cmpq (imm 0) !%r12 ++
         jg "1f" ++
         movq (imm 1) !%rsi ++
-        negq !%rbx ++
+        negq !%r12 ++
         negq !%rax ++
         label "1" ++
         cqto ++
-        idivq !%rbx  ++
+        idivq !%r12  ++
         cmpq (imm 0) !%rdx ++
         jge "1f" ++
-        addq !%rbx !%rdx ++
+        addq !%r12 !%rdx ++
         label "1" ++
         movq !%rdx !%rax ++
         cmpq (imm 0) !%rsi ++
@@ -1084,7 +1123,10 @@ let compile_program p ofile =
           label ".Sprint_str" ++ string "%s" ++
           label ".true" ++ string "true" ++
           label ".false" ++ string "false" ++
-          label ".nothing" ++ string "nothing")
+          label ".nothing" ++ string "nothing" ++
+          label ".Sprint_list" ++ string "[list: " ++
+          label ".Sprint_fin_list" ++ string "]" ++
+          label ".Sprint_sep" ++ string ", ")
     }
   in
   let f = open_out ofile in
