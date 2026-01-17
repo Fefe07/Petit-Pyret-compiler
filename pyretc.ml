@@ -68,7 +68,8 @@ let () =
     if !type_only then exit 0 ;
     (* Ouvre le fichier compile_out en écriture *)
     let ofile = Filename.chop_suffix !ifile ".arr" ^ ".s" in
-    Compile.compile_program new_ast ofile 
+    Compile.compile_program new_ast ofile;
+    exit 0
   
   with
   | Lexer.Lexing_error c ->

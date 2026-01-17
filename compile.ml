@@ -355,36 +355,14 @@ let rec compile_expr = function
     compile_expr e1 ++
     pushq !%rax ++
     compile_expr e2 ++
-    popq rdx ++
-    movq (ind rax) !%rsi ++
-    movq (ind rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    jne "8f" ++
-    cmpq (imm 0) !%rsi ++
-    je "9f" ++
-    cmpq (imm 4) !%rsi ++
-    je "9f" ++
-    cmpq (imm 1) !%rsi ++
-    je "1f" ++
-    cmpq (imm 2) !%rsi ++
-    je "1f" ++
-    exit 2 ++ (*TODO: le reste*)
-    label "1" ++
-    movq (ind ~ofs:8 rax) !%rsi ++
-    movq (ind ~ofs:8 rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    je "9f" ++
-    label "8" ++
-    pushq (imm 1) ++
-    jmp "7f" ++
-    label "9" ++
-    pushq (imm 0) ++
-    label "7" ++
-    movq (imm 16) !%rdi ++
-    call "my_malloc" ++
-    movq (imm 1) (ind rax) ++
+    pushq !%rax ++
+    call "equality" ++
     popq rdi ++
-    movq !%rdi (ind ~ofs:8 rax)
+    popq rdi ++
+    movq (ind ~ofs:8 rax) !%rdi ++
+    negq !%rdi ++
+    addq (imm 1) !%rdi ++
+    movq !%rdi (ind~ofs:8 rax)
 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
@@ -1048,8 +1026,8 @@ let compile_program p ofile =
 
         (* Comparaison de string *)
         label "3" ++
-        addq (imm 8) !%rax ++
-        addq (imm 8) !%rdx ++
+        addq (imm 16) !%rax ++
+        addq (imm 16) !%rdx ++
         label "6" ++
         movb (ind rax) !%sil ++
         movb (ind rdx) !%dil ++
