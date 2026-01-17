@@ -42,7 +42,9 @@ let rec get_vars_expr (env:local_env) (fermeture:local_env) fp e =
     let new_ferm, new_fp = get_vars_expr env fermeture fp e1 in 
     let new_ferm2, new_fp2 = get_vars_expr env new_ferm new_fp e2 in 
     get_vars_expr env new_ferm2 new_fp2 e3
-  | Elam _ | Ecases _ -> failwith "not supported"
+  | Elam2 (args, b) -> get_vars_block env fermeture fp b
+  | Elam _ -> assert false
+  | Ecases _ -> failwith "not supported"
 
 and get_vars_stmt env fermeture fp s = match s with
   | Sexpr e -> let new_ferm, new_fp = get_vars_expr env fermeture fp e in
@@ -119,6 +121,14 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
     let e2', i2 = alloc_expr env fermeture fpcur e2 in
     let e3', i3 = alloc_expr env fermeture fpcur e3 in
     Aif(e1', e2', e3'), fpcur
+  | Elam2 (args, ins) -> 
+      let new_env, _ = List.fold_left (fun (map, i) id -> 
+        (Smap.add id i map, i-1)) (Smap.empty, -3) args in
+      let new_fermeture, taille = get_vars_block new_env Smap.empty 0 ins in
+      let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 1 in 
+      let ferm_comp = Smap.fold 
+        (fun s i map -> Fmap.add i (fst (alloc_expr env fermeture 0 (Evar s))) map) new_fermeture Fmap.empty in 
+      Alam(args,new_expr, ferm_comp, taille), fpcur
   | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) fermeture (fpcur: int) = function 
@@ -473,6 +483,34 @@ let rec compile_expr = function
         done; !code
       )
       
+  | Alam (args, ins, fermeture, taille) -> 
+      let base =
+      let fin = new_label () in
+      let nom = new_label () in
+      jmp fin ++
+      label nom ++
+      pushq !%rbp ++
+      movq !%rsp !%rbp ++
+      compile_block ins ++
+      movq !%rbp !%rsp ++
+      popq rbp ++
+      ret ++
+      label fin ++
+      movq (imm (16 + 8*taille)) !%rdi ++
+      call "my_malloc" ++
+      movq (imm 6) (ind rax) ++
+      leaq (lab nom) rdx ++
+      movq !%rdx (ind ~ofs:8 rax) ++
+      pushq !%rax
+      in 
+      Fmap.fold (fun i e code ->
+        code ++
+        compile_expr e ++
+        popq rdi ++
+        movq !%rax (ind ~ofs:(16 + 8*i) rdi) ++
+        pushq !%rdi
+      ) fermeture base
+      ++ popq rax
 
   | _ -> failwith "compile_expr - cas non traité"
 
@@ -754,12 +792,13 @@ let compile_stmt (codefun, codemain) = function
 *)
 let compile_program p ofile =
   let start_env = 
+    Smap.add "raise" 6 (
     Smap.add "print" 1 (
     Smap.add "link" 5 (
       Smap.add "empty" 4 (
         Smap.add "nothing" 3 (
-          Smap.singleton "num-modulo" 2)))) in
-  let start_fpcur = 6 in 
+          Smap.singleton "num-modulo" 2))))) in
+  let start_fpcur = 7 in 
   (* 1 pour print
      2 pour num_modulo 
      3 pour nothing  
@@ -802,6 +841,12 @@ let compile_program p ofile =
         call "my_malloc" ++
         movq (imm 6) (ind rax) ++
         leaq (lab "link") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++ 
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "raise") rdx ++
         movq !%rdx (ind ~ofs:8 rax) ++
         pushq !%rax ++ 
 
@@ -1014,6 +1059,16 @@ let compile_program p ofile =
         movq (imm 1) (ind rax) ++
         popq rdi ++
         movq !%rdi (ind ~ofs:8 rax) ++
+        movq !%rbp !%rsp ++
+        popq rbp ++
+        ret ++
+        (*function raise*)
+        label "raise" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        movq (imm 60) !%rax ++
+        movq (imm 2) !%rdi ++
+        syscall ++
         movq !%rbp !%rsp ++
         popq rbp ++
         ret

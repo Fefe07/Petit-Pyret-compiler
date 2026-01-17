@@ -448,6 +448,7 @@ and w_expr (exp:expr) (environment:env) : types*expr =
       ) params [] in
       let r_type = (read_ta new_env ta) in
       let type1, expr1 = (w new_env b) in
-      (sous_type type1 r_type ; Tfun(start_types, r_type), Elam(Funbody(params,ta,b)))
+
+      (sous_type type1 r_type ; Tfun(start_types, r_type), Elam2(List.map fst params, expr1))
 
 let typing (s : stmt list) : types*block = w start_environment s

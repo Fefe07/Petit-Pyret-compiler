@@ -73,6 +73,7 @@ and expr =
   | Ecall of expr * expr list
   | Ecases of type_annotation * expr * branch list
   | Eif of expr * expr * expr
+  | Elam2 of ident list * block
 
 and aexpr = 
   | Abexpr of binop * aexpr * aexpr
@@ -80,7 +81,7 @@ and aexpr =
   | Aident of int
   | Aferm of int
   | Ablock of ablock
-  | Alam of afunbody
+  | Alam of ident list * ablock * fermeture * int
   | Acall of aexpr * aexpr list
   | Acases of type_annotation * aexpr * abranch list
   | Aif of aexpr * aexpr * aexpr
