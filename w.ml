@@ -399,7 +399,7 @@ and w_expr (exp:expr) (environment:env) : types*expr =
       | Cstr  _ -> Tstr)
     , Ecst cst)
   | Evar id -> find environment id, Evar id
-  | Eblock b -> let type1, ins = w environment b in type1, Eblock b
+  | Eblock b -> let type1, ins = w environment b in type1, Eblock ins 
   | Eif (e1, e2, e3) -> 
       let type1, expr1 = w_expr e1 environment in
       let type2, expr2 = w_expr e2 environment in
