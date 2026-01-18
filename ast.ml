@@ -55,11 +55,11 @@ type stmt =
   | Sfun2 of ident * ident list * block
 
 and astmt = 
-  | Aexpr of aexpr * frame_size
-  | Aaffect of int * aexpr * frame_size
-  | Avar of ident * aexpr * frame_size
-  | Aconst of ident * aexpr * frame_size 
-  | Afun of ident * ident list * ablock * frame_size * fermeture * int
+  | Aexpr of aexpr
+  | Aaffect of int * aexpr
+  | Avar of ident * aexpr
+  | Aconst of ident * aexpr
+  | Afun of ident * ident list * ablock * fermeture * int
 
 and block = stmt list
 and ablock = astmt list
@@ -83,12 +83,12 @@ and aexpr =
   | Ablock of ablock
   | Alam of ident list * ablock * fermeture * int
   | Acall of aexpr * aexpr list
-  | Acases of type_annotation * aexpr * abranch list
+  | Acases of aexpr * abranch list
   | Aif of aexpr * aexpr * aexpr
   | Aprint of aexpr
 
 and funbody = Funbody of param list * type_annotation * block
-and afunbody = Afunbody of param list * type_annotation * ablock
+and afunbody = Afunbody of param list * ablock
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
 and abranch = Abranch1 of ident * ablock | Abranch2 of ident * ident list * ablock
 and fermeture = aexpr Fmap.t

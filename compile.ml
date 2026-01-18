@@ -15,16 +15,6 @@ let new_label () =
   counter := !counter + 1 ;
   "l" ^ (string_of_int !counter)
 
-
-let extract_length (s : astmt) : frame_size =
-  match s with 
-  | Aexpr(_,i) -> i
-  | Aaffect(_,_,i) -> i
-  | Avar(_,_,i) -> i
-  | Aconst (_,_,i) -> i 
-  | Afun(_,_,_,i,_,_) -> i
-
-
 let rec get_vars_expr (env:local_env) (fermeture:local_env) fp e = 
   match e with 
   | Ecst i -> fermeture, fp
@@ -98,29 +88,15 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
     Abexpr (b, exp1, exp2), fpcur
 
   | Eblock(instructions) -> 
-    (* let (i,l') = List.fold_left (fun (i, tl) e -> let e',j = alloc_expr env fpcur e in max i j, e' :: tl) (fpcur,[]) l in 
-    Ablock(l'),i *)
     let (code, new_fpcur) = alloc_block instructions env fermeture fpcur  in 
-    (*
-    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in *)
     (Ablock(code),fpcur)
     
-  (*| Ecall (expr, args) -> Acall (fst (alloc_expr env fpcur expr),
-      List.map (fun x -> fst (alloc_expr env fpcur x)) args), fpcur
-  *)
-
   | Ecall (f, l) ->
-    (* Comme les fonctions sont des valeurs de première classe,
-      elles peuvent être calculée/définies comme fonctions anonymes
-      avant d'être appelées*)
-
     (* Évaluation stricte : les paramètres sont évalués avant l'appel *)
     let l' = List.fold_right (fun expr expr_list -> 
       let e', _ = alloc_expr env fermeture fpcur expr in e'::expr_list
     ) l [] in 
     (* let taille_fermeture = List.length l  in  *)
-    (* Il faut aussi prendre en compte le déplacement de rbp... *)
-    (* Au fait la gestion des fermetures fait que fpcur n'est plus utilisé *)
     let f', _ = alloc_expr env fermeture (fpcur (*+ taille_fermeture*)) f in 
     Acall (f',l'), fpcur
 
@@ -155,7 +131,7 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
       (* print_string "Coucou\n" ; *)
       (* Il faut prendre en compte l'ajout des valeurs x,y *)
       (*dans le cas link(x,y)*)
-      Acases(typ, c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]), fpcur
+      Acases(c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]), fpcur
     end
     | _ -> assert false
     end
@@ -164,13 +140,13 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
 and alloc_stmt (env: local_env) fermeture (fpcur: int) = function 
   | Sexpr e ->
       let new_expr, fpcur = alloc_expr env fermeture fpcur e in
-      (Aexpr (new_expr,0), fpcur), env
+      (Aexpr (new_expr), fpcur), env
   | Sconst (id, ta, e) | Svar (id,ta,e) -> 
       let new_expr, fpcur = alloc_expr env fermeture fpcur e in
-      (Aconst (id, new_expr, fpcur), fpcur + 1), Smap.add id fpcur env
+      (Aconst (id, new_expr), fpcur + 1), Smap.add id fpcur env
   | Saffect (id, e) -> 
       let new_expr, fpcur = alloc_expr env fermeture fpcur e in
-      (Aaffect (Smap.find id env, new_expr, fpcur), fpcur), env
+      (Aaffect (Smap.find id env, new_expr), fpcur), env
   | Sfun2 (ident, args, ins) -> 
       let new_env, _ = List.fold_left (fun (map, i) id -> 
         (Smap.add id i map, i-1)) (Smap.empty, -3) args in
@@ -180,10 +156,9 @@ and alloc_stmt (env: local_env) fermeture (fpcur: int) = function
         (fun s i map -> Fmap.add i 
         (fst (alloc_expr (Smap.add ident fpcur env) fermeture 0 (Evar s))) map)
         new_fermeture Fmap.empty in 
-      ((Afun(ident, args,new_expr, 0 , ferm_comp, taille), fpcur + 1), 
+      ((Afun(ident, args,new_expr, ferm_comp, taille), fpcur + 1), 
       Smap.add ident fpcur env)
   | Sfun _ -> failwith "HUGOOOO" 
-  (* | _ -> failwith "alloc_stmt - cas non traité" *)
 
 and alloc_block instructions (env: local_env) fermeture (fpcur: int) = 
     (* Le nouvel environnement n'est pas renvoyé *)
@@ -197,7 +172,6 @@ and alloc_block instructions (env: local_env) fermeture (fpcur: int) =
       ) ([], fpcur, env) instructions
     in (List.rev statements), fpcur
 
-(* and alloc env fpcur = List.fold_left (alloc_stmt env fpcur)  *)
 
 let popn n = addq (imm n) !%rsp
 let pushn n = subq (imm n) !%rsp
@@ -320,71 +294,6 @@ let rec compile_expr = function
     call "equality" ++
     popq rdi ++
     popq rdi 
-
-(*     
-    movq (ind rax) !%rsi ++
-    movq (ind rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    jne "8f" ++
-    (* Discrimine le type des valeurs *)
-    cmpq (imm 0) !%rsi ++
-    je "9f" ++
-    cmpq (imm 4) !%rsi ++
-    je "9f" ++
-    cmpq (imm 1) !%rsi ++
-    je "1f" ++
-    cmpq (imm 2) !%rsi ++
-    je "1f" ++
-
-    cmpq (imm 3) !%rsi ++
-    je "3f" ++
-    cmpq (imm 5) !%rsi ++
-    je "5f" ++
-
-    movq (imm 60) !%rax ++ (*TODO: le reste*)
-    movq (imm 2) !%rdi ++
-    syscall ++
-    label "1" ++
-    movq (ind ~ofs:8 rax) !%rsi ++
-    movq (ind ~ofs:8 rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    je "9f" ++
-    label "8" ++
-    pushq (imm 0) ++
-    jmp "7f" ++
-
-    (* Comparaison de string *)
-    label "3" ++
-    addq (imm 8) !%rax ++
-    addq (imm 8) !%rdx ++
-    label "6" ++
-    movb (ind rax) !%sil ++
-    movb (ind rdx) !%dil ++
-    addq (imm 1) !%rax ++
-    addq (imm 1) !%rdx ++
-    cmpb !%sil !%dil ++
-    jne "8b" ++
-    cmpb (imm 0) !%sil ++  
-    je "9f" ++
-    jmp "6b" ++
-
-    (* Comparaison de link*)
-    label "5" ++
-    (* Il faut compiler et comparer les valeurs dans le link *)
-    (* Solution : appels résursifs de l'égalité *)
-    (* compile_expr (Abexpr(Beq, (ind ~ofs:8 rsi),(ind ~ofs:8 rdi) )) ++  *)
-
-
-    label "9" ++
-    pushq (imm 1) ++
-
-    (* Inscrit le résultat*)
-    label "7" ++
-    movq (imm 16) !%rdi ++
-    call "my_malloc" ++
-    movq (imm 1) (ind rax) ++
-    popq rdi ++
-    movq !%rdi (ind ~ofs:8 rax) *)
 
   | Abexpr (b, e1, e2) when b == Bneq ->
     compile_expr e1 ++
@@ -523,18 +432,10 @@ let rec compile_expr = function
         pushq !%rdi
       ) fermeture base
       ++ popq rax
-  | Acases (_, c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]) ->
+  | Acases (c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]) ->
     let label1 = new_label() in 
     let label2 = new_label() in 
     compile_expr c ++
-    (* movq !%rax !%rdx ++ *)
-
-
-    (* movq !%rax !%r10 ++
-    popq rdx ++
-    popq rdx ++
-    movq !%rax !%r11 ++ *)
-
 
     cmpq (imm 4) (ind rax) ++
     je label1 ++
@@ -560,16 +461,15 @@ let rec compile_expr = function
   (* | _ -> failwith "compile_expr - cas non traité" *)
 
 and compile_stmt = function 
-  | Aexpr (e, _) -> compile_expr e
-  | Aconst (_, e, _) -> 
+  | Aexpr (e) -> compile_expr e
+  | Aconst (_, e) -> 
       compile_expr e ++
       pushq !%rax
-  | Aaffect (i, e, _) -> 
+  | Aaffect (i, e) -> 
       compile_expr e ++
-      (*TODO on doit pouvoir free ici*)
       movq !%rax (ind ~ofs:(-8*i) rbp)
 
-  | Afun (id, args, ins, _, fermeture, taille) -> 
+  | Afun (id, args, ins, fermeture, taille) -> 
       let base =
       let fin = new_label () in
       let nom = new_label () in
@@ -602,239 +502,6 @@ and compile_stmt = function
 and compile_block instructions = 
   List.fold_left (fun c s -> c ++ compile_stmt s) nop instructions
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-(*
-
-let extract_length (s : astmt) : frame_size =
-  match s with 
-  | Aexpr(_,i) -> i
-  | Aaffect(_,_,i) -> i
-  | Avar(_,_,_,i) -> i
-  | Aconst (_,_,_,i) -> i 
-  | Afun(_,_,_,_,_,i) -> i
- 
-
-let rec alloc_expr (env: local_env) (fpcur: int) = function
-  | Ecst c ->
-    Acst c, fpcur
-
-  | Evar x -> (match Smap.find_opt x env with
-    | Some i -> Lvar i, fpcur
-    | None -> if not (Hashtbl.mem genv x) then raise (VarUndef x)
-        else Gvar x, fpcur)
-
-  | Bexpr (o, e1, e2)->
-    let exp1, s1 = alloc_expr env fpcur e1 in
-    let exp2, s2 = alloc_expr env fpcur e2 in
-    ABexpr (o, exp1, exp2), max s1 s2
-
-  | Ecall (f, l) ->
-    (* Créée un bug car f est une expression *)
-    (* TODO : comprendre Ecall *)
-    (* Comme les fonctions sont des valeurs de première classe,
-      elles peuvent être calculée/définies comme fonctions anonymes
-      avant d'être appelées*)
-    let l, s = List.fold_right (fun e (le, s) -> 
-      let e', s' = alloc_expr env fpcur e in (e'::le, max s s')
-    ) l ([],fpcur) in 
-    let f', i = alloc_expr env fpcur f in 
-    Acall (f',l), max i s 
-
-  | Eblock(instructions) -> 
-    (* let (i,l') = List.fold_left (fun (i, tl) e -> let e',j = alloc_expr env fpcur e in max i j, e' :: tl) (fpcur,[]) l in 
-    Ablock(l'),i *)
-    let code = alloc instructions in 
-    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
-    (Ablock(code),i' + fpcur)
-  
-  | Eif (e1, e2, e3) -> 
-    let e1', i1 = alloc_expr env fpcur e1 in
-    let e2', i2 = alloc_expr env fpcur e2 in
-    let e3', i3 = alloc_expr env fpcur e3 in
-    Aif(e1', e2', e3'), max (max i1 i2) i3 
-    
-  | Ecases(t, e, l) -> begin 
-    (* Si la liste a passé le parsing, 
-      alors elle est composée de deux éléments qui sont empty et list(x,y)*)
-    let e1,i1 = alloc_expr env fpcur e in 
-    match l with 
-    | (Branch1 ("empty", be))::(Branch2 ("link", [x;y], bl))::[]
-    | (Branch2 ("link", [x;y], bl))::(Branch1 ("empty", be))::[] ->
-      let ((Ablock b2),i2) = alloc_expr env fpcur (Eblock be) in 
-      let ((Ablock b3),i3) = alloc_expr env fpcur (Eblock  bl) in 
-      (* +16 : affectation des variables x et y *)
-      (Acases(t,e1,[Branch1 ("empty", b2); Branch2 ("link", [x;y], b3)]), 
-      max i1 (max i2 (i3 + 16)))
-    | _ -> assert false
-  end
-  | Elam (Funbody(l_args, typ_out, instructions)) ->
-    (* let (i,l') = List.fold_left (fun (i, tl) e -> 
-      let e',j = alloc_expr env fpcur e in max i j, e' :: tl
-    ) (fpcur,[]) l_args in  *)
-    let code = alloc instructions in 
-    let i' = List.fold_left (fun acc s -> max acc (extract_length s)) 0 code in 
-    (* max i (i' + fpcur) *)
-    (Alam(Afunbody(l_args, typ_out, code)),i' + fpcur)
-
-    
-  | _ -> failwith "pas traité"
-  (* 
-
-  | PLetin (x, e1, e2) ->
-    let exp1, s1 = alloc_expr env fpcur e1 in 
-    let exp2, s2 = alloc_expr (Smap.add x (-(fpcur + 8)) env) (fpcur+8) e2 in 
-    Letin (-(fpcur + 8), exp1, exp2), max s1 s2
-*)
-
-
-
-and alloc_stmt = function
-  (* Il y a des blocks dans les expressions *)
-  (* -> Comment savoir si une variable est locale ou globale ? *)
-  (* Solutions : *)
-  (* - créer deux fonctions distinctes *)
-  (* - Traiter la table des variables globales comme un environnement local *)
-
-
-
-(* | Sexpr of expr
-| Saffect of ident * expr
-| Svar of ident * type_annotation * expr
-| Sconst of ident * type_annotation * expr 
-| Sfun of ident * ident list * param list * type_annotation * block
-
- *)
-
-  | Saffect (x, e) ->
-  let e, s = alloc_expr Smap.empty 0 e in
-  (Hashtbl.add genv x () ; Set (x, e, s))
-  (* 
-
-  | PFun (f, l, e) ->
-    let new_env, _ = List.fold_left (fun (env,i) s -> (Smap.add s (8*i) env, i+1))
-    (Smap.empty, 2) l in 
-    let e', s' = alloc_expr new_env 0 e in Fun (f, e', s')
-
-  | PPrint e ->
-    let e, fpmax = alloc_expr Smap.empty 0 e in
-    Print (e, fpmax) *)
-
-and alloc = List.map alloc_stmt
-
-(******************************************************************************)
-(* phase 2 : production de code *)
-
-let popn n = addq (imm n) !%rsp
-let pushn n = subq (imm n) !%rsp
-
-let rec compile_expr = function
-  | Acst i ->
-    (* C'est quoi imm ? *)
-      pushq (imm i)
-
-  | LVar fp_x ->
-      pushq (ind ~ofs:fp_x rbp)
-
-  | GVar x ->
-      pushq (lab x)
-
-  | Binop (o, e1, e2)->
-      compile_expr e1 ++
-      compile_expr e2 ++
-      popq r12 ++ popq rax ++
-      (match o with
-        | Add -> addq !%r12 !%rax
-        | Sub -> subq !%r12 !%rax
-        | Mul -> imulq !%r12 !%rax
-        | Div -> cqto ++ idivq !%r12) ++
-       pushq !%rax
-
-  | Letin (ofs, e1, e2) ->
-      compile_expr e1 ++
-      popq rax ++ movq !%rax (ind ~ofs rbp) ++
-      compile_expr e2
-
-  | Call (f, l) ->
-      List.fold_right (fun e c -> compile_expr e ++ c) l nop ++
-      call f ++
-      popn (8*List.length l) ++
-      pushq !%rax
-
-let compile_stmt (codefun, codemain) = function
-  | Set (x, e, fpmax) ->
-    let code =
-      pushn fpmax ++
-      compile_expr e ++
-      popq rax ++ movq !%rax (lab x) ++
-      popn fpmax
-    in
-    codefun, codemain ++ code
-
-  | Fun (f, e, fpmax) ->
-    let code = 
-      label f ++
-      pushq !%rbp ++
-      movq !%rsp !%rbp ++
-      pushn fpmax ++ 
-      compile_expr e ++
-      popq rax ++
-      popn fpmax ++
-      popq rbp ++
-      ret 
-    in
-    code ++ codefun, codemain
-
-
-  | Print (e, fpmax) ->
-    let code =
-      pushn fpmax ++
-      compile_expr e ++
-      popq rdi ++
-      popn fpmax ++
-      call "print_int"
-    in
-    codefun, codemain ++ code
-*)
 let compile_program p ofile =
   let start_env = 
     Smap.add "fold" 8 (
