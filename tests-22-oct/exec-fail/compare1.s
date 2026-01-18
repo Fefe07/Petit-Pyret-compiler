@@ -35,8 +35,6 @@ main:
 	leaq raise(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
-<<<<<<< HEAD
-=======
 	movq $16, %rdi
 	call my_malloc
 	movq $6, 0(%rax)
@@ -49,7 +47,6 @@ main:
 	leaq fold(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	jmp l21
 l22:
 	pushq %rbp
@@ -70,15 +67,9 @@ l21:
 	popq %rdi
 	movq %rax, 16(%rdi)
 	pushq %rdi
-<<<<<<< HEAD
-	movq -56(%rbp), %rax
-	pushq %rax
-	movq -56(%rbp), %rax
-=======
 	movq -72(%rbp), %rax
 	pushq %rax
 	movq -72(%rbp), %rax
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	pushq %rax
 	call equality
 	popq %rdi
@@ -191,21 +182,6 @@ num_modulo:
 	movq 24(%rbp), %rsi
 	movq 8(%rsi), %rax
 	movq 32(%rbp), %rsi
-<<<<<<< HEAD
-	movq 8(%rsi), %rbx
-	movq $0, %rsi
-	cmpq $0, %rbx
-	jg 1f
-	movq $1, %rsi
-	negq %rbx
-	negq %rax
-1:
-	cqto
-	idivq %rbx
-	cmpq $0, %rdx
-	jge 1f
-	addq %rbx, %rdx
-=======
 	movq 8(%rsi), %r12
 	movq $0, %rsi
 	cmpq $0, %r12
@@ -219,7 +195,6 @@ num_modulo:
 	cmpq $0, %rdx
 	jge 1f
 	addq %r12, %rdx
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 1:
 	movq %rdx, %rax
 	cmpq $0, %rsi
@@ -284,13 +259,8 @@ equality:
 	pushq $0
 	jmp 7f
 3:
-<<<<<<< HEAD
-	addq $8, %rax
-	addq $8, %rdx
-=======
 	addq $16, %rax
 	addq $16, %rdx
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 6:
 	movb 0(%rax), %sil
 	movb 0(%rdx), %dil
@@ -339,8 +309,6 @@ raise:
 	movq %rbp, %rsp
 	popq %rbp
 	ret
-<<<<<<< HEAD
-=======
 each:
 	pushq %rbp
 	movq %rsp, %rbp
@@ -398,7 +366,6 @@ fold:
 	popq %rbx
 	popq %rbp
 	ret
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	.data
 .Sprint_int:
 	.string "%d"

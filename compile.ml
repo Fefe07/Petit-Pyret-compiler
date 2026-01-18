@@ -110,8 +110,6 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
   *)
 
   | Ecall (f, l) ->
-    (* Créée un bug car f est une expression *)
-    (* TODO : comprendre Ecall *)
     (* Comme les fonctions sont des valeurs de première classe,
       elles peuvent être calculée/définies comme fonctions anonymes
       avant d'être appelées*)
@@ -124,7 +122,7 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
     (* Il faut aussi prendre en compte le déplacement de rbp... *)
     (* Au fait la gestion des fermetures fait que fpcur n'est plus utilisé *)
     let f', _ = alloc_expr env fermeture (fpcur (*+ taille_fermeture*)) f in 
-    Acall (f',l'), fpcur(* max i s*) (* Pourquoi max ? c'est n'importe quoi ça *)
+    Acall (f',l'), fpcur
 
   | Eif (e1, e2, e3) -> 
     let e1', i1 = alloc_expr env fermeture fpcur e1 in

@@ -35,8 +35,6 @@ main:
 	leaq raise(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
-<<<<<<< HEAD
-=======
 	movq $16, %rdi
 	call my_malloc
 	movq $6, 0(%rax)
@@ -49,7 +47,6 @@ main:
 	leaq fold(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	movq $23, %rdi
 	call my_malloc
 	movq $3, 0(%rax)
@@ -91,13 +88,10 @@ print:
 	je 2f
 	cmpq $3, 0(%rdi)
 	je 3f
-<<<<<<< HEAD
-=======
 	cmpq $4, 0(%rdi)
 	je 4f
 	cmpq $5, 0(%rdi)
 	je 4f
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	jmp 7f
 0:
 	movq $.nothing, %rdi
@@ -129,8 +123,6 @@ print_true:
 	movq $0, %rax
 	call printf
 	jmp 7f
-<<<<<<< HEAD
-=======
 4:
 	pushq %rbx
 	movq %rdi, %rbx
@@ -164,7 +156,6 @@ fin_print_list:
 	call printf
 	popq %rbx
 	jmp 7f
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 7:
 	movq 24(%rbp), %rax
 	popq %rbp
@@ -175,21 +166,6 @@ num_modulo:
 	movq 24(%rbp), %rsi
 	movq 8(%rsi), %rax
 	movq 32(%rbp), %rsi
-<<<<<<< HEAD
-	movq 8(%rsi), %rbx
-	movq $0, %rsi
-	cmpq $0, %rbx
-	jg 1f
-	movq $1, %rsi
-	negq %rbx
-	negq %rax
-1:
-	cqto
-	idivq %rbx
-	cmpq $0, %rdx
-	jge 1f
-	addq %rbx, %rdx
-=======
 	movq 8(%rsi), %r12
 	movq $0, %rsi
 	cmpq $0, %r12
@@ -203,7 +179,6 @@ num_modulo:
 	cmpq $0, %rdx
 	jge 1f
 	addq %r12, %rdx
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 1:
 	movq %rdx, %rax
 	cmpq $0, %rsi
@@ -268,13 +243,8 @@ equality:
 	pushq $0
 	jmp 7f
 3:
-<<<<<<< HEAD
-	addq $8, %rax
-	addq $8, %rdx
-=======
 	addq $16, %rax
 	addq $16, %rdx
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 6:
 	movb 0(%rax), %sil
 	movb 0(%rdx), %dil
@@ -323,8 +293,6 @@ raise:
 	movq %rbp, %rsp
 	popq %rbp
 	ret
-<<<<<<< HEAD
-=======
 each:
 	pushq %rbp
 	movq %rsp, %rbp
@@ -382,7 +350,6 @@ fold:
 	popq %rbx
 	popq %rbp
 	ret
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	.data
 .Sprint_int:
 	.string "%d"
@@ -394,12 +361,9 @@ fold:
 	.string "false"
 .nothing:
 	.string "nothing"
-<<<<<<< HEAD
-=======
 .Sprint_list:
 	.string "[list: "
 .Sprint_fin_list:
 	.string "]"
 .Sprint_sep:
 	.string ", "
->>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
