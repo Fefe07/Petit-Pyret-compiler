@@ -35,35 +35,19 @@ main:
 	leaq raise(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
-	jmp l21
-l22:
-	pushq %rbp
-	movq %rsp, %rbp
-	movq 16(%rbp), %rdi
-	movq 0(%rdi), %rax
-	movq %rbp, %rsp
-	popq %rbp
-	ret
-l21:
-	movq $24, %rdi
+	movq $23, %rdi
 	call my_malloc
-	movq $6, 0(%rax)
-	leaq l22(%rip), %rdx
-	movq %rdx, 8(%rax)
+	movq $3, 0(%rax)
+	movb $101, 16(%rax)
+	movb $114, 17(%rax)
+	movb $114, 18(%rax)
+	movb $101, 19(%rax)
+	movb $117, 20(%rax)
+	movb $114, 21(%rax)
+	movq $6, 8(%rax)
+	movb $0, 22(%rax)
 	pushq %rax
-	movq -24(%rbp), %rax
-	popq %rdi
-	movq %rax, 16(%rdi)
-	pushq %rdi
-	movq -56(%rbp), %rax
-	pushq %rax
-	movq -56(%rbp), %rax
-	pushq %rax
-	call equality
-	popq %rdi
-	popq %rdi
-	pushq %rax
-	movq -8(%rbp), %rax
+	movq -48(%rbp), %rax
 	addq $16, %rax
 	pushq %rax
 	call *-8(%rax)

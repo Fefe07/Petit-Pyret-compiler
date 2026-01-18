@@ -44,7 +44,13 @@ let rec get_vars_expr (env:local_env) (fermeture:local_env) fp e =
     get_vars_expr env new_ferm2 new_fp2 e3
   | Elam2 (args, b) -> get_vars_block env fermeture fp b
   | Elam _ -> assert false
-  | Ecases _ -> failwith "not supported"
+  | Ecases (_,condition, [Branch1 (id1, b1) ; Branch2 (id2, [x;y], b2)]) 
+  | Ecases (_,condition, [Branch2 (id2, [x;y], b2) ; Branch1 (id1, b1)]) -> 
+    let new_ferm, new_fp = get_vars_expr env fermeture fp condition in 
+    let new_ferm', new_fp' = get_vars_block env new_ferm new_fp b1 in 
+    (* ????*)
+    get_vars_block (Smap.add x 42 (Smap.add y 42 env)) new_ferm' new_fp' b2
+  | Ecases _ -> assert(false) 
 
 and get_vars_stmt env fermeture fp s = match s with
   | Sexpr e -> let new_ferm, new_fp = get_vars_expr env fermeture fp e in
@@ -70,8 +76,12 @@ and get_vars_block env fermeture fp ins =
 
 
 let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e = 
-  (* print_expr e ;
-  print_newline(); *)
+  (* Printf.printf "current expression :\n" ;
+  flush stdout ;
+  print_expr e ;
+  flush stdout ;
+  print_newline();
+  flush stdout ; *)
   match e with 
   | Ecst i -> Acst i, fpcur
   | Evar id -> (
@@ -127,8 +137,30 @@ let rec alloc_expr (env: local_env) (fermeture: local_env) (fpcur: int) e =
       let new_fermeture, taille = get_vars_block new_env Smap.empty 0 ins in
       let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 1 in 
       let ferm_comp = Smap.fold 
-        (fun s i map -> Fmap.add i (fst (alloc_expr env fermeture 0 (Evar s))) map) new_fermeture Fmap.empty in 
+        (fun s i map -> Fmap.add i 
+        (fst (alloc_expr env fermeture 0 (Evar s))) map
+        ) new_fermeture Fmap.empty in 
       Alam(args,new_expr, ferm_comp, taille), fpcur
+  | Ecases (typ,condition, branches) -> 
+    let c, _ = alloc_expr env fermeture fpcur condition in 
+    begin match branches with 
+    | [Branch1 (id1, b1) ; Branch2 (id2, [x;y], b2)] 
+    | [Branch2 (id2, [x;y], b2) ; Branch1 (id1, b1)] -> begin
+      (* print_block b1 ;
+      print_block b2 ; *)
+      (* Normalement le bon format a été testé *)
+      assert(id1 = "empty" && id2 = "link") ;
+      let b1',_ =  alloc_block b1 env fermeture fpcur  in 
+      (* print_string ("added " ^x ^" and " ^y^".\n") ; *)
+      let new_env = Smap.add x fpcur (Smap.add y (fpcur+1) env) in 
+      let b2',_ =  alloc_block b2 new_env fermeture (fpcur+2)  in 
+      (* print_string "Coucou\n" ; *)
+      (* Il faut prendre en compte l'ajout des valeurs x,y *)
+      (*dans le cas link(x,y)*)
+      Acases(typ, c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]), fpcur
+    end
+    | _ -> assert false
+    end
   | _ -> failwith "alloc_expr - cas non traite"
 
 and alloc_stmt (env: local_env) fermeture (fpcur: int) = function 
@@ -147,8 +179,11 @@ and alloc_stmt (env: local_env) fermeture (fpcur: int) = function
       let new_fermeture, taille = get_vars_block new_env Smap.empty 0 ins in
       let new_expr, fpcur2 = alloc_block ins new_env new_fermeture 1 in 
       let ferm_comp = Smap.fold 
-        (fun s i map -> Fmap.add i (fst (alloc_expr (Smap.add ident fpcur env) fermeture 0 (Evar s))) map) new_fermeture Fmap.empty in 
-      (Afun(ident, args,new_expr, 0 , ferm_comp, taille), fpcur + 1), Smap.add ident fpcur env
+        (fun s i map -> Fmap.add i 
+        (fst (alloc_expr (Smap.add ident fpcur env) fermeture 0 (Evar s))) map)
+        new_fermeture Fmap.empty in 
+      ((Afun(ident, args,new_expr, 0 , ferm_comp, taille), fpcur + 1), 
+      Smap.add ident fpcur env)
   | Sfun _ -> failwith "HUGOOOO" 
   (* | _ -> failwith "alloc_stmt - cas non traité" *)
 
@@ -157,9 +192,11 @@ and alloc_block instructions (env: local_env) fermeture (fpcur: int) =
     (*puisque toutes les variables déclarées ne vivent que dans le bloc *)
     let statements, fpcur, _ =
       List.fold_left (
-      fun (stmts, fpcur, env) stmt ->
-        let (new_stmt, new_fpcur), new_env = (alloc_stmt env fermeture fpcur stmt) in 
-        (new_stmt::stmts), new_fpcur, new_env) ([], fpcur, env) instructions
+      fun (stmts, fpcur', env') stmt ->
+        let (new_stmt, new_fpcur), new_env = 
+          (alloc_stmt env' fermeture fpcur' stmt) in 
+        (new_stmt::stmts), new_fpcur, new_env
+      ) ([], fpcur, env) instructions
     in (List.rev statements), fpcur
 
 (* and alloc env fpcur = List.fold_left (alloc_stmt env fpcur)  *)
@@ -402,7 +439,6 @@ let rec compile_expr = function
             | Ble
             | Bgt
             | Bge -> 
-              (*TODO: ne pas vérifier uniquement la valeur pour l'égalité, mais aussi le type*)
               let l = new_label()  in
               let l2 = new_label() in
               cmpq !%rdx !%rax ++ 
@@ -511,8 +547,41 @@ let rec compile_expr = function
         pushq !%rdi
       ) fermeture base
       ++ popq rax
+  | Acases (_, c, [Abranch1 (id1, b1'); Abranch2 (id2, [x;y], b2')]) ->
+    let label1 = new_label() in 
+    let label2 = new_label() in 
+    compile_expr c ++
+    (* movq !%rax !%rdx ++ *)
 
-  | _ -> failwith "compile_expr - cas non traité"
+
+    (* movq !%rax !%r10 ++
+    popq rdx ++
+    popq rdx ++
+    movq !%rax !%r11 ++ *)
+
+
+    cmpq (imm 4) (ind rax) ++
+    je label1 ++
+    
+    (* link :*)
+      (* Il faut rajouter les valeurs de x et y sur la pile*)
+    pushq (ind ~ofs:8 rax)++
+    pushq (ind ~ofs:16 rax) ++
+    compile_block b2' ++
+    jmp label2 ++
+
+    (* empty :*)
+    label label1 ++
+    compile_block b1' ++
+    
+    label label2 
+    
+
+
+  | Acases _ -> failwith "mauvais format pour Acases"  
+
+
+  (* | _ -> failwith "compile_expr - cas non traité" *)
 
 and compile_stmt = function 
   | Aexpr (e, _) -> compile_expr e

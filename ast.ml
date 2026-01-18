@@ -90,30 +90,43 @@ and aexpr =
 and funbody = Funbody of param list * type_annotation * block
 and afunbody = Afunbody of param list * type_annotation * ablock
 and branch = Branch1 of ident * block | Branch2 of ident * ident list * block
-and abranch = Branch1 of ident * ablock | Branch2 of ident * ident list * ablock
+and abranch = Abranch1 of ident * ablock | Abranch2 of ident * ident list * ablock
 and fermeture = aexpr Fmap.t
 
 
-let rec print_expr = function 
+let rec print_expr e = (
+  match e with 
   | Eif(e1,e2,e3) -> 
-    (print_string "Eif\nCondition :\n" ; 
+    (Printf.printf "Eif\nCondition :\n" ; 
     print_expr e1 ;
-    print_string "Si :\n" ; 
+    Printf.printf "Si :\n" ; 
     print_expr e2 ;
-    print_string "Sinon :\n" ; 
+    Printf.printf "Sinon :\n" ; 
     print_expr e3)
-  | Bexpr (_,e1,e2) -> (print_string "Binop\n"; print_expr e1; print_newline (); print_expr e2)
-  | Ecall (e, l) -> print_string "Appel " ; print_expr e ; List.iter print_expr l; print_newline ();
+  | Bexpr (_,e1,e2) -> (Printf.printf "Binop\n"; print_expr e1; print_newline (); print_expr e2)
+  | Ecall (e, l) -> Printf.printf "Appel " ; print_expr e ; List.iter print_expr l; print_newline ();
   | Ecst c -> begin 
-    match c with 
-    | Cstr s -> print_string s 
-    | Cint i -> print_int i 
-    | Cbool b -> if b then print_string "true" else print_string "false"
+    Printf.printf "Constante : " ;
+    (match c with 
+    | Cstr s -> Printf.printf "%s" s 
+    | Cint i -> Printf.printf "%d" i
+    | Cbool b -> if b then Printf.printf "true" else Printf.printf "false");
+    Printf.printf "\n"
   end
-  | Eblock b -> print_string "block:" ; List.iter print_stmt b
-  | Evar v -> print_string ("var "^v^" ")
-  | _ -> print_string "Autre\n"
+  | Eblock b -> print_block b
+  | Evar v -> Printf.printf "var %s " v
+  | Ecases (_,condition, [Branch1 (id1, b1) ; Branch2 (id2, [x;y], b2)]) -> 
+    Printf.printf "\ncondition : " ; print_expr condition ;
+    Printf.printf "\nCas 1 : " ; print_block b1 ;
+    Printf.printf "\nCas 2 : " ; print_block b2 ;
+  | _ -> Printf.printf "Autre\n" ) ;
+  flush stdout 
 
 and print_stmt = function
 | Sexpr e -> print_expr e 
-| _ -> print_string "Autre stmt\n"
+| _ -> Printf.printf "Autre stmt\n"
+
+and print_block b = 
+  Printf.printf "block:" ; 
+  List.iter (fun s -> print_stmt s ; Printf.printf "\n") b ;
+  Printf.printf "end_block \n"
