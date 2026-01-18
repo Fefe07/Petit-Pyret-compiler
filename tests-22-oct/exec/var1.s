@@ -35,12 +35,31 @@ main:
 	leaq raise(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
+<<<<<<< HEAD
+=======
+	movq $16, %rdi
+	call my_malloc
+	movq $6, 0(%rax)
+	leaq each(%rip), %rdx
+	movq %rdx, 8(%rax)
+	pushq %rax
+	movq $16, %rdi
+	call my_malloc
+	movq $6, 0(%rax)
+	leaq fold(%rip), %rdx
+	movq %rdx, 8(%rax)
+	pushq %rax
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	movq $16, %rdi
 	call my_malloc
 	movq $2, 0(%rax)
 	movq $41, 8(%rax)
 	pushq %rax
+<<<<<<< HEAD
 	movq -56(%rbp), %rax
+=======
+	movq -72(%rbp), %rax
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	pushq %rax
 	movq -8(%rbp), %rax
 	addq $16, %rax
@@ -52,8 +71,13 @@ main:
 	call my_malloc
 	movq $2, 0(%rax)
 	movq $42, 8(%rax)
+<<<<<<< HEAD
 	movq %rax, -56(%rbp)
 	movq -56(%rbp), %rax
+=======
+	movq %rax, -72(%rbp)
+	movq -72(%rbp), %rax
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	pushq %rax
 	movq -8(%rbp), %rax
 	addq $16, %rax
@@ -97,6 +121,10 @@ print:
 	je 2f
 	cmpq $3, 0(%rdi)
 	je 3f
+	cmpq $4, 0(%rdi)
+	je 4f
+	cmpq $5, 0(%rdi)
+	je 4f
 	jmp 7f
 0:
 	movq $.nothing, %rdi
@@ -128,6 +156,39 @@ print_true:
 	movq $0, %rax
 	call printf
 	jmp 7f
+4:
+	pushq %rbx
+	movq %rdi, %rbx
+	movq $.Sprint_list, %rdi
+	movq $0, %rax
+	call printf
+	cmpq $4, 0(%rbx)
+	je fin_print_list
+	movq 8(%rbx), %rdi
+	pushq %rdi
+	pushq %rdi
+	call print
+	addq $16, %rsp
+	movq 16(%rbx), %rbx
+boucle_print_list:
+	cmpq $4, 0(%rbx)
+	je fin_print_list
+	movq $.Sprint_sep, %rdi
+	movq $0, %rax
+	call printf
+	movq 8(%rbx), %rdi
+	pushq %rdi
+	pushq %rdi
+	call print
+	addq $16, %rsp
+	movq 16(%rbx), %rbx
+	jmp boucle_print_list
+fin_print_list:
+	movq $.Sprint_fin_list, %rdi
+	movq $0, %rax
+	call printf
+	popq %rbx
+	jmp 7f
 7:
 	movq 24(%rbp), %rax
 	popq %rbp
@@ -138,6 +199,7 @@ num_modulo:
 	movq 24(%rbp), %rsi
 	movq 8(%rsi), %rax
 	movq 32(%rbp), %rsi
+<<<<<<< HEAD
 	movq 8(%rsi), %rbx
 	movq $0, %rsi
 	cmpq $0, %rbx
@@ -151,6 +213,21 @@ num_modulo:
 	cmpq $0, %rdx
 	jge 1f
 	addq %rbx, %rdx
+=======
+	movq 8(%rsi), %r12
+	movq $0, %rsi
+	cmpq $0, %r12
+	jg 1f
+	movq $1, %rsi
+	negq %r12
+	negq %rax
+1:
+	cqto
+	idivq %r12
+	cmpq $0, %rdx
+	jge 1f
+	addq %r12, %rdx
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 1:
 	movq %rdx, %rax
 	cmpq $0, %rsi
@@ -215,8 +292,13 @@ equality:
 	pushq $0
 	jmp 7f
 3:
+<<<<<<< HEAD
 	addq $8, %rax
 	addq $8, %rdx
+=======
+	addq $16, %rax
+	addq $16, %rdx
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 6:
 	movb 0(%rax), %sil
 	movb 0(%rdx), %dil
@@ -265,6 +347,66 @@ raise:
 	movq %rbp, %rsp
 	popq %rbp
 	ret
+<<<<<<< HEAD
+=======
+each:
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq %rbx
+	pushq %r12
+	movq 24(%rbp), %rbx
+	addq $16, %rbx
+	movq 32(%rbp), %r12
+1:
+	movq 0(%r12), %rdi
+	cmpq $4, %rdi
+	je 2f
+	movq 8(%r12), %rdx
+	pushq %rdx
+	pushq %rbx
+	call *-8(%rbx)
+	addq $16, %rsp
+	movq 16(%r12), %r12
+	jmp 1b
+2:
+	movq $8, %rdi
+	call my_malloc
+	movq $0, 0(%rax)
+	popq %r12
+	popq %rbx
+	popq %rbp
+	ret
+fold:
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq %rbx
+	pushq %r12
+	pushq %r13
+	movq 24(%rbp), %rbx
+	addq $16, %rbx
+	movq 32(%rbp), %r13
+	movq 40(%rbp), %r12
+1:
+	movq 0(%r12), %rdi
+	cmpq $4, %rdi
+	je 2f
+	movq 8(%r12), %rdx
+	pushq %rdx
+	pushq %r13
+	pushq %rbx
+	call *-8(%rbx)
+	movq %rax, %r13
+	addq $24, %rsp
+	movq 16(%r12), %r12
+	jmp 1b
+2:
+	movq %r13, %rax
+	popq %r13
+	popq %r12
+	popq %rbx
+	popq %rbp
+	ret
+>>>>>>> e9f567992749abf74410a1635f9a009bfaf00633
 	.data
 .Sprint_int:
 	.string "%d"
@@ -276,3 +418,9 @@ raise:
 	.string "false"
 .nothing:
 	.string "nothing"
+.Sprint_list:
+	.string "[list: "
+.Sprint_fin_list:
+	.string "]"
+.Sprint_sep:
+	.string ", "

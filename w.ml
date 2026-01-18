@@ -353,7 +353,7 @@ and w_stmt (environment:env) (stmt: stmt) : env*types*stmt =
       typ = (Tfun (start_types, ret_type))
     },
     Tnothing, Sfun2(id,List.map fst params,instructions))
-  | Sfun2  _ -> failwith "HUGOOOOOOOOOOOO"
+  | Sfun2  _ -> assert false
 
 and w_expr (exp:expr) (environment:env) : types*expr = 
   match exp with
@@ -450,6 +450,6 @@ and w_expr (exp:expr) (environment:env) : types*expr =
       let type1, expr1 = (w new_env b) in
 
       (sous_type type1 r_type ; Tfun(start_types, r_type), Elam2(List.map fst params, expr1))
-  | Elam2 _ -> failwith "HUGOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO"
+  | Elam2 _ -> assert false
 
 let typing (s : stmt list) : types*block = w start_environment s

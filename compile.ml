@@ -392,36 +392,14 @@ let rec compile_expr = function
     compile_expr e1 ++
     pushq !%rax ++
     compile_expr e2 ++
-    popq rdx ++
-    movq (ind rax) !%rsi ++
-    movq (ind rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    jne "8f" ++
-    cmpq (imm 0) !%rsi ++
-    je "9f" ++
-    cmpq (imm 4) !%rsi ++
-    je "9f" ++
-    cmpq (imm 1) !%rsi ++
-    je "1f" ++
-    cmpq (imm 2) !%rsi ++
-    je "1f" ++
-    exit 2 ++ (*TODO: le reste*)
-    label "1" ++
-    movq (ind ~ofs:8 rax) !%rsi ++
-    movq (ind ~ofs:8 rdx) !%rdi ++
-    cmpq !%rsi !%rdi ++
-    je "9f" ++
-    label "8" ++
-    pushq (imm 1) ++
-    jmp "7f" ++
-    label "9" ++
-    pushq (imm 0) ++
-    label "7" ++
-    movq (imm 16) !%rdi ++
-    call "my_malloc" ++
-    movq (imm 1) (ind rax) ++
+    pushq !%rax ++
+    call "equality" ++
     popq rdi ++
-    movq !%rdi (ind ~ofs:8 rax)
+    popq rdi ++
+    movq (ind ~ofs:8 rax) !%rdi ++
+    negq !%rdi ++
+    addq (imm 1) !%rdi ++
+    movq !%rdi (ind~ofs:8 rax)
 
   | Abexpr (b, e1, e2) -> begin
       compile_expr e1 ++
@@ -469,9 +447,9 @@ let rec compile_expr = function
             | Badd -> addq !%rdx !%rax
             | Bsub -> subq !%rdx !%rax
             | Bmul -> imulq !%rdx !%rax
-            | Bdiv -> movq !%rdx !%rbx ++
+            | Bdiv -> movq !%rdx !%r12 ++
                 cqto ++
-                idivq !%rbx 
+                idivq !%r12 
                 (* Si j'ai bien compris ça marche *)
             | _ -> assert false
             ) ++
@@ -805,12 +783,12 @@ let rec compile_expr = function
   | Binop (o, e1, e2)->
       compile_expr e1 ++
       compile_expr e2 ++
-      popq rbx ++ popq rax ++
+      popq r12 ++ popq rax ++
       (match o with
-        | Add -> addq !%rbx !%rax
-        | Sub -> subq !%rbx !%rax
-        | Mul -> imulq !%rbx !%rax
-        | Div -> cqto ++ idivq !%rbx) ++
+        | Add -> addq !%r12 !%rax
+        | Sub -> subq !%r12 !%rax
+        | Mul -> imulq !%r12 !%rax
+        | Div -> cqto ++ idivq !%r12) ++
        pushq !%rax
 
   | Letin (ofs, e1, e2) ->
@@ -861,18 +839,22 @@ let compile_stmt (codefun, codemain) = function
 *)
 let compile_program p ofile =
   let start_env = 
+    Smap.add "fold" 8 (
+    Smap.add "each" 7 (
     Smap.add "raise" 6 (
     Smap.add "print" 1 (
     Smap.add "link" 5 (
       Smap.add "empty" 4 (
         Smap.add "nothing" 3 (
-          Smap.singleton "num-modulo" 2))))) in
-  let start_fpcur = 7 in 
+          Smap.singleton "num-modulo" 2))))))) in
+  let start_fpcur = 9 in 
   (* 1 pour print
      2 pour num_modulo 
      3 pour nothing  
      4 pour empty 
-     5 pour link()*)
+     5 pour link()
+     6 pour raise 
+     7 pour each*)
   let p, _ = alloc_block p start_env Smap.empty start_fpcur in
   let code = List.fold_left (fun c s -> c ++ compile_stmt s ) nop p in
   let p =
@@ -912,13 +894,27 @@ let compile_program p ofile =
         leaq (lab "link") rdx ++
         movq !%rdx (ind ~ofs:8 rax) ++
         pushq !%rax ++ 
+        (*on alloue raise*)
         movq (imm 16) !%rdi ++
         call "my_malloc" ++
         movq (imm 6) (ind rax) ++
         leaq (lab "raise") rdx ++
         movq !%rdx (ind ~ofs:8 rax) ++
         pushq !%rax ++ 
-
+        (*on alloue each*)
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "each") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++ 
+        (*Allocation de fold*)
+        movq (imm 16) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 6) (ind rax) ++
+        leaq (lab "fold") rdx ++
+        movq !%rdx (ind ~ofs:8 rax) ++
+        pushq !%rax ++ 
 
       (* Le code compilé est rajouté ici *)
         code ++
@@ -950,6 +946,10 @@ let compile_program p ofile =
         je "2f" ++
         cmpq (imm 3) (ind rdi) ++
         je "3f" ++
+        cmpq (imm 4) (ind rdi) ++
+        je "4f" ++
+        cmpq (imm 5) (ind rdi) ++
+        je "4f" ++
         jmp "7f" ++
         label "0" ++
         movq (ilab ".nothing") !%rdi++
@@ -981,6 +981,41 @@ let compile_program p ofile =
         movq (imm 0) !%rax ++
         call "printf" ++
         jmp "7f" ++
+        label "4" ++
+        pushq !%rbx ++
+        movq !%rdi !%rbx ++
+        movq (ilab ".Sprint_list") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        cmpq (imm 4) (ind rbx) ++
+        je "fin_print_list" ++
+        movq (ind ~ofs:8 rbx) !%rdi ++
+        pushq !%rdi ++
+        pushq !%rdi ++
+        call "print" ++
+        addq (imm 16) !%rsp ++
+        movq (ind ~ofs:16 rbx) !%rbx ++
+        label "boucle_print_list" ++
+        cmpq (imm 4) (ind rbx) ++
+        je "fin_print_list" ++
+        movq (ilab ".Sprint_sep") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        movq (ind ~ofs:8 rbx) !%rdi ++
+        pushq !%rdi ++
+        pushq !%rdi ++
+        call "print" ++
+        addq (imm 16) !%rsp ++
+        movq (ind ~ofs:16 rbx) !%rbx ++
+        jmp "boucle_print_list" ++
+
+        label "fin_print_list"++
+        movq (ilab ".Sprint_fin_list") !%rdi ++
+        movq (imm 0) !%rax ++
+        call "printf" ++
+        popq rbx ++
+        jmp "7f" ++
+
         label "7" ++
         movq (ind ~ofs:24 rbp) !%rax ++
         popq rbp ++
@@ -991,19 +1026,19 @@ let compile_program p ofile =
         movq (ind ~ofs:24 rbp) !%rsi ++
         movq (ind ~ofs:8 rsi) !%rax ++
         movq (ind ~ofs:32 rbp) !%rsi ++
-        movq (ind ~ofs:8 rsi) !%rbx ++
+        movq (ind ~ofs:8 rsi) !%r12 ++
         movq (imm 0) !%rsi ++
-        cmpq (imm 0) !%rbx ++
+        cmpq (imm 0) !%r12 ++
         jg "1f" ++
         movq (imm 1) !%rsi ++
-        negq !%rbx ++
+        negq !%r12 ++
         negq !%rax ++
         label "1" ++
         cqto ++
-        idivq !%rbx  ++
+        idivq !%r12  ++
         cmpq (imm 0) !%rdx ++
         jge "1f" ++
-        addq !%rbx !%rdx ++
+        addq !%r12 !%rdx ++
         label "1" ++
         movq !%rdx !%rax ++
         cmpq (imm 0) !%rsi ++
@@ -1078,8 +1113,8 @@ let compile_program p ofile =
 
         (* Comparaison de string *)
         label "3" ++
-        addq (imm 8) !%rax ++
-        addq (imm 8) !%rdx ++
+        addq (imm 16) !%rax ++
+        addq (imm 16) !%rdx ++
         label "6" ++
         movb (ind rax) !%sil ++
         movb (ind rdx) !%dil ++
@@ -1140,7 +1175,65 @@ let compile_program p ofile =
         syscall ++
         movq !%rbp !%rsp ++
         popq rbp ++
+        ret ++
+        label "each" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        pushq !%rbx ++
+        pushq !%r12 ++
+        movq (ind ~ofs:24 rbp) !%rbx ++
+        addq (imm 16) !%rbx ++
+        movq (ind ~ofs:32 rbp) !%r12 ++
+        label "1" ++
+        movq (ind r12) !%rdi++
+        cmpq (imm 4) !%rdi ++
+        je "2f" ++
+        movq (ind ~ofs:8 r12) !%rdx ++
+        pushq !%rdx ++
+        pushq !%rbx ++
+        call_star (ind ~ofs:(-8) rbx) ++
+        addq (imm 16) !%rsp ++
+        movq (ind ~ofs:16 r12) !%r12 ++
+        jmp "1b" ++
+        label "2" ++
+        movq (imm 8) !%rdi ++
+        call "my_malloc" ++
+        movq (imm 0) (ind rax) ++
+        popq r12 ++
+        popq rbx ++
+        popq rbp ++
+        ret ++
+        label "fold" ++
+        pushq !%rbp ++
+        movq !%rsp !%rbp ++
+        pushq !%rbx ++
+        pushq !%r12 ++
+        pushq !%r13 ++
+        movq (ind ~ofs:24 rbp) !%rbx ++
+        addq (imm 16) !%rbx ++
+        movq (ind ~ofs:32 rbp) !%r13 ++
+        movq (ind ~ofs:40 rbp) !%r12 ++
+        label "1" ++
+        movq (ind r12) !%rdi++
+        cmpq (imm 4) !%rdi ++
+        je "2f" ++
+        movq (ind ~ofs:8 r12) !%rdx ++
+        pushq !%rdx ++
+        pushq !%r13 ++
+        pushq !%rbx ++
+        call_star (ind ~ofs:(-8) rbx) ++
+        movq !%rax !%r13 ++
+        addq (imm 24) !%rsp ++
+        movq (ind ~ofs:16 r12) !%r12 ++
+        jmp "1b" ++
+        label "2" ++
+        movq !%r13 !%rax ++
+        popq r13 ++
+        popq r12 ++
+        popq rbx ++
+        popq rbp ++
         ret
+
 
 
     ;
@@ -1153,7 +1246,10 @@ let compile_program p ofile =
           label ".Sprint_str" ++ string "%s" ++
           label ".true" ++ string "true" ++
           label ".false" ++ string "false" ++
-          label ".nothing" ++ string "nothing")
+          label ".nothing" ++ string "nothing" ++
+          label ".Sprint_list" ++ string "[list: " ++
+          label ".Sprint_fin_list" ++ string "]" ++
+          label ".Sprint_sep" ++ string ", ")
     }
   in
   let f = open_out ofile in
