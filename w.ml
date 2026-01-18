@@ -353,7 +353,7 @@ and w_stmt (environment:env) (stmt: stmt) : env*types*stmt =
       typ = (Tfun (start_types, ret_type))
     },
     Tnothing, Sfun2(id,List.map fst params,instructions))
-  | Sfun2  _ -> failwith "HUGOOOOOOOOOOOO"
+  | Sfun2  _ -> assert false
 
 and w_expr (exp:expr) (environment:env) : types*expr = 
   match exp with
