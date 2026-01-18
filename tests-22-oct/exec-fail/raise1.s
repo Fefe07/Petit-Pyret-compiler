@@ -47,40 +47,19 @@ main:
 	leaq fold(%rip), %rdx
 	movq %rdx, 8(%rax)
 	pushq %rax
-	movq $16, %rdi
-	call my_malloc
-	movq $2, 0(%rax)
-	movq $41, 8(%rax)
-	pushq %rax
-	movq -72(%rbp), %rax
-	pushq %rax
-	movq -8(%rbp), %rax
-	addq $16, %rax
-	pushq %rax
-	call *-8(%rax)
-	popq %rdi
-	popq %rdi
-	movq $16, %rdi
-	call my_malloc
-	movq $2, 0(%rax)
-	movq $42, 8(%rax)
-	movq %rax, -72(%rbp)
-	movq -72(%rbp), %rax
-	pushq %rax
-	movq -8(%rbp), %rax
-	addq $16, %rax
-	pushq %rax
-	call *-8(%rax)
-	popq %rdi
-	popq %rdi
-	movq $18, %rdi
+	movq $23, %rdi
 	call my_malloc
 	movq $3, 0(%rax)
-	movb $10, 16(%rax)
-	movq $1, 8(%rax)
-	movb $0, 17(%rax)
+	movb $101, 16(%rax)
+	movb $114, 17(%rax)
+	movb $114, 18(%rax)
+	movb $101, 19(%rax)
+	movb $117, 20(%rax)
+	movb $114, 21(%rax)
+	movq $6, 8(%rax)
+	movb $0, 22(%rax)
 	pushq %rax
-	movq -8(%rbp), %rax
+	movq -48(%rbp), %rax
 	addq $16, %rax
 	pushq %rax
 	call *-8(%rax)
